@@ -1,0 +1,175 @@
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/tamrad-logo.png";
+import { LogOut, Menu, X } from "lucide-react";
+import { useState, type ComponentType, type ReactNode } from "react";
+
+export type NavItem = {
+  label: string;
+  to: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+export function DashboardShell({
+  title,
+  subtitle,
+  nav,
+  user,
+  headerExtra,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  nav: NavItem[];
+  user?: { name?: string | null; email?: string | null } | null;
+  headerExtra?: ReactNode;
+  children: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [open, setOpen] = useState(false);
+
+  async function handleSignOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
+
+  const initial = (user?.name ?? user?.email ?? "?").charAt(0).toUpperCase();
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 flex w-64 flex-col border-l border-border bg-primary text-primary-foreground transition-transform lg:translate-x-0 ${
+          open ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+        }`}
+      >
+        <div className="flex h-20 items-center justify-between gap-2 border-b border-primary-foreground/10 px-6">
+          <div className="flex items-center gap-2">
+            <img src={logo} alt="تمراد" className="h-9 w-9" />
+            <div>
+              <div className="text-lg font-black">تمراد</div>
+              <div className="text-[10px] opacity-60">{subtitle}</div>
+            </div>
+          </div>
+          <button className="lg:hidden" onClick={() => setOpen(false)}>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-1 p-4">
+          {nav.map((n) => {
+            const active =
+              pathname === n.to || (n.to !== "/" && pathname.startsWith(n.to));
+            return (
+              <Link
+                key={n.to}
+                to={n.to}
+                onClick={() => setOpen(false)}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  active
+                    ? "bg-primary-foreground/15 text-primary-foreground"
+                    : "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                }`}
+              >
+                <n.icon className="h-4 w-4" />
+                {n.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-primary-foreground/10 p-4">
+          <button
+            onClick={handleSignOut}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium opacity-80 transition-all hover:bg-primary-foreground/10 hover:opacity-100"
+          >
+            <LogOut className="h-4 w-4" />
+            تسجيل الخروج
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 lg:mr-64">
+        <header className="flex h-20 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-xl lg:px-10">
+          <div className="flex items-center gap-3">
+            <button className="lg:hidden" onClick={() => setOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="text-sm text-muted-foreground">
+              تمراد <span className="mx-2">/</span> {title}
+            </div>
+            {headerExtra && <div className="ms-2">{headerExtra}</div>}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <div className="text-sm font-bold">{user?.name ?? "—"}</div>
+              <div className="text-xs text-muted-foreground">{user?.email}</div>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lime font-black text-lime-foreground">
+              {initial}
+            </div>
+          </div>
+        </header>
+
+        <div className="p-6 lg:p-10">{children}</div>
+      </main>
+    </div>
+  );
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-black">{title}</h1>
+        {subtitle && (
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export function EmptyState({
+  icon: Icon,
+  title,
+  hint,
+  action,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card py-14 text-center">
+      <Icon className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
+      <p className="text-base font-bold">{title}</p>
+      {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
