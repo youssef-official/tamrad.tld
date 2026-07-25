@@ -56,16 +56,35 @@ function ChatMonitorPage() {
     queryKey: ["admin", "chat-messages", orderId],
     enabled: !!orderId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("order_messages")
-        .select("*")
-        .eq("order_id", orderId)
-        .order("created_at", { ascending: true });
-      return data ?? [];
+      // Live chat (active orders) + archived chat (closed orders are
+      // archive-purged from participants' view but kept for admins).
+      const [liveRes, archivedRes] = await Promise.all([
+        supabase
+          .from("order_messages")
+          .select("*")
+          .eq("order_id", orderId)
+          .order("created_at", { ascending: true }),
+        (supabase.from("order_messages_archive" as any) as any)
+          .select("*")
+          .eq("order_id", orderId)
+          .order("created_at", { ascending: true }),
+      ]);
+      const seen = new Set<string>();
+      return [...(liveRes.data ?? []), ...((archivedRes.data ?? []) as any[])]
+        .filter((m: any) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        })
+        .sort(
+          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
     },
   });
 
   const orderInfo = useMemo(() => orders.find((o: any) => o.id === orderId), [orders, orderId]);
+  const orderClosed =
+    !!orderInfo && ["delivered", "cancelled", "rejected"].includes((orderInfo as any).status);
 
   return (
     <div className="space-y-6">
@@ -93,7 +112,9 @@ function ChatMonitorPage() {
           >
             <option value="">— اختر مطعم —</option>
             {tenants.map((t: any) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
         </label>
@@ -111,7 +132,9 @@ function ChatMonitorPage() {
           >
             <option value="">— جميع المناديب —</option>
             {drivers.map((d: any) => (
-              <option key={d.user_id} value={d.user_id}>{d.driver_name}</option>
+              <option key={d.user_id} value={d.user_id}>
+                {d.driver_name}
+              </option>
             ))}
           </select>
         </label>
@@ -137,12 +160,21 @@ function ChatMonitorPage() {
       {orderInfo && (
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-            <div className="text-sm font-bold text-foreground">طلب #{(orderInfo as any).order_number}</div>
+            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+              طلب #{(orderInfo as any).order_number}
+              {orderClosed && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                  محادثة مؤرشفة (الطلب مغلق)
+                </span>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground">{messages.length} رسالة</div>
           </div>
 
           {messages.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">لا توجد رسائل في هذا الطلب</div>
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              لا توجد رسائل في هذا الطلب
+            </div>
           ) : (
             <ul className="space-y-2">
               {messages.map((m: any) => {
@@ -160,10 +192,14 @@ function ChatMonitorPage() {
                     </div>
                     <div className="flex-1">
                       <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-bold">{isDriver ? "السائق" : isCustomer ? "الزبون" : m.sender_role}</span>
+                        <span className="font-bold">
+                          {isDriver ? "السائق" : isCustomer ? "الزبون" : m.sender_role}
+                        </span>
                         <span dir="ltr">{new Date(m.created_at).toLocaleString("ar-IQ")}</span>
                       </div>
-                      <div className="whitespace-pre-wrap text-sm text-foreground">{m.content ?? "—"}</div>
+                      <div className="whitespace-pre-wrap text-sm text-foreground">
+                        {m.content ?? "—"}
+                      </div>
                     </div>
                   </li>
                 );

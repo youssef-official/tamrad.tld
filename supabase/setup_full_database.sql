@@ -745,6 +745,11 @@ CREATE POLICY "Drivers view own creds"
   FOR SELECT TO authenticated
   USING (user_id = auth.uid());
 
+CREATE POLICY "Super admins view all driver creds"
+  ON public.driver_credentials
+  FOR SELECT TO authenticated
+  USING (public.is_super_admin(auth.uid()));
+
 CREATE TRIGGER set_driver_creds_updated_at
   BEFORE UPDATE ON public.driver_credentials
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -980,6 +985,31 @@ WITH CHECK (
   )
 );
 
+-- 1b) Archived order chat — kept for super-admin dispute resolution after close
+CREATE TABLE IF NOT EXISTS public.order_messages_archive (
+  id UUID PRIMARY KEY,
+  order_id UUID NOT NULL,
+  tenant_id UUID NOT NULL,
+  sender_id UUID NOT NULL,
+  sender_role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  archived_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS order_messages_archive_order_idx
+  ON public.order_messages_archive(order_id, created_at);
+CREATE INDEX IF NOT EXISTS order_messages_archive_tenant_idx
+  ON public.order_messages_archive(tenant_id, created_at);
+
+GRANT SELECT ON public.order_messages_archive TO authenticated;
+GRANT ALL ON public.order_messages_archive TO service_role;
+ALTER TABLE public.order_messages_archive ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super admins read archived chat"
+ON public.order_messages_archive FOR SELECT TO authenticated
+USING (public.is_super_admin(auth.uid()));
+
 -- 2) Driver live locations
 CREATE TABLE public.driver_locations (
   driver_id UUID PRIMARY KEY,
@@ -1073,11 +1103,16 @@ DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- 5) Auto-purge chat on order close
+-- 5) Archive chat on order close (hidden from participants, kept for super admin)
 CREATE OR REPLACE FUNCTION public.purge_order_chat_on_close()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NEW.status IN ('delivered','cancelled','rejected') AND OLD.status IS DISTINCT FROM NEW.status THEN
+    INSERT INTO public.order_messages_archive (id, order_id, tenant_id, sender_id, sender_role, content, created_at)
+    SELECT id, order_id, tenant_id, sender_id, sender_role, content, created_at
+    FROM public.order_messages
+    WHERE order_id = NEW.id
+    ON CONFLICT (id) DO NOTHING;
     DELETE FROM public.order_messages WHERE order_id = NEW.id;
   END IF;
   RETURN NEW;
