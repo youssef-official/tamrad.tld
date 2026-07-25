@@ -20,7 +20,10 @@ dist-ssr
 .wrangler/
 .dev.vars
 
-# Editor directories and files
+# Editor & Tooling directories and files
+.commandcode/
+.lovable/
+.zcode/
 .vscode/*
 !.vscode/extensions.json
 .idea
