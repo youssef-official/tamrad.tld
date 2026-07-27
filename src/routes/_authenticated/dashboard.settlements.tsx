@@ -66,6 +66,8 @@ function SettlementsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settlements-v2"] });
+      qc.invalidateQueries({ queryKey: ["driver-owed"] });
+      qc.invalidateQueries({ queryKey: ["driver-delivery-summary"] });
       toast.success("تم تحديث الطلب");
       setNoteFor(null); setOwnerNote("");
     },
@@ -164,7 +166,7 @@ function SettlementsPage() {
             </h3>
             <p className="mb-3 text-sm text-muted-foreground">
               {noteFor.approve
-                ? "بالضغط على تأكيد، تُصفَّى ذمة المندوب في النظام."
+                ? "يُخصم مبلغ هذا الطلب فقط من ذمة المندوب؛ لا تُصفّى الذمة كاملة إلا إذا غطّى المبلغ كل المستحق."
                 : "اكتب سبب الرفض ليصل للمندوب."}
             </p>
             <textarea

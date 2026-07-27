@@ -20,6 +20,23 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || "/";
+  event.waitUntil(clients.openWindow(target));
+});
+
+// Ready for Web Push when the server-side VAPID sender is configured.
+self.addEventListener("push", (event) => {
+  const payload = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(payload.title || "تمراد", {
+    body: payload.body || "لديك إشعار جديد",
+    icon: "/favicon.png",
+    badge: "/favicon.png",
+    data: payload.data || {},
+  }));
+});
+
 // NetworkFirst for HTML navigations, CacheFirst for static assets.
 self.addEventListener("fetch", (event) => {
   const req = event.request;

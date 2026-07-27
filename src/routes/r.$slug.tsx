@@ -587,6 +587,15 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
         setShowLoginPrompt(true);
         return;
       }
+      const savedPhone = phone.trim();
+      if (savedPhone && savedPhone !== me?.profile?.phone) {
+        const { error: phoneError } = await supabase
+          .from("profiles")
+          .update({ phone: savedPhone })
+          .eq("id", u.user.id);
+        if (phoneError) throw phoneError;
+        qc.invalidateQueries({ queryKey: ["me"] });
+      }
       const items = Object.entries(cart).map(([key, v]) => {
         const anyV = v as any;
         return {
@@ -605,7 +614,7 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
         order_number: orderNumber,
         total_iqd: grandTotal,
         items,
-        customer_phone: phone,
+        customer_phone: savedPhone,
         customer_address: [
           selectedAddress?.label,
           selectedAddress?.full_address,

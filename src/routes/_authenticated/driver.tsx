@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe, formatIQD } from "@/lib/useMe";
 import { DashboardShell, EmptyState, PageHeader } from "@/components/DashboardShell";
-import { Bike, Phone, MapPin, LayoutDashboard, ShoppingBag, AlertCircle, Volume2, MessageCircle, Navigation, LifeBuoy, Wallet, History, Download, WifiOff } from "lucide-react";
+import { Bike, Phone, MapPin, LayoutDashboard, ShoppingBag, AlertCircle, Volume2, MessageCircle, Navigation, LifeBuoy, Wallet, History, Download, WifiOff, Route as RouteIcon, Banknote, BadgeDollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import { alertBeep, beep, installAudioUnlocker, isAudioUnlocked, requestNotificationPermission, showNotification, unlockAudio } from "@/lib/sound";
@@ -76,14 +76,6 @@ function DriverPage() {
     return () => window.clearInterval(t);
   }, []);
 
-  // Track live location whenever driver is signed in
-  const locTracker = useDriverLocationTracker({
-    driverId: me?.user.id,
-    tenantId: me?.tenantId,
-    enabled: !!me?.isDriver,
-  });
-
-
   const { data: orders } = useQuery({
     queryKey: ["driver-orders", me?.tenantId, me?.user.id],
     queryFn: async () => {
@@ -97,6 +89,13 @@ function DriverPage() {
     },
     enabled: !!me?.tenantId && me?.isDriver,
     refetchInterval: 8000,
+  });
+
+  // Route points are stored only while the driver has a delivery in progress.
+  const locTracker = useDriverLocationTracker({
+    driverId: me?.user.id,
+    tenantId: me?.tenantId,
+    enabled: !!me?.isDriver && ((orders?.length ?? cachedOrders?.length ?? 0) > 0),
   });
 
   // Realtime + alert on new assignments
@@ -265,6 +264,7 @@ function DriverPage() {
         </div>
       )}
 
+      {me?.tenantId && <DriverStatsPanel tenantId={me.tenantId} />}
       {me?.tenantId && <DriverCashPanel tenantId={me.tenantId} />}
       {me?.tenantId && <DriverHistoryPanel />}
 
@@ -278,6 +278,37 @@ function DriverPage() {
   );
 }
 
+function DriverStatsPanel({ tenantId }: { tenantId: string }) {
+  const { data: summary } = useQuery({
+    queryKey: ["driver-delivery-summary", tenantId],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("driver_delivery_summary", { _tenant_id: tenantId });
+      if (error) throw error;
+      return (Array.isArray(data) ? data[0] : data) as {
+        delivered_orders: number; delivery_distance_km: number; cash_due_iqd: number; delivery_earnings_iqd: number;
+      } | null;
+    },
+    refetchInterval: 15000,
+  });
+  const cards = [
+    { label: "طلبات تم توصيلها", value: new Intl.NumberFormat("ar-IQ").format(summary?.delivered_orders ?? 0), Icon: Bike },
+    { label: "المسافة المقطوعة", value: `${(summary?.delivery_distance_km ?? 0).toFixed(1)} كم`, Icon: RouteIcon },
+    { label: "ذمة النقد الحالية", value: formatIQD(summary?.cash_due_iqd ?? 0), Icon: Banknote },
+    { label: "صافي ربح التوصيل", value: formatIQD(summary?.delivery_earnings_iqd ?? 0), Icon: BadgeDollarSign },
+  ];
+  return (
+    <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map(({ label, value, Icon }) => (
+        <div key={label} className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-soft)]">
+          <Icon className="mb-2 h-5 w-5 text-primary" />
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="mt-1 text-xl font-black text-primary">{value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DriverCashPanel({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState("");
@@ -286,16 +317,14 @@ function DriverCashPanel({ tenantId }: { tenantId: string }) {
   const { data: owed } = useQuery({
     queryKey: ["driver-owed", tenantId],
     queryFn: async () => {
-      const { data } = await (supabase.from("driver_orders_history_view") as any)
-        .select("total_iqd, delivery_fee_iqd, payment_collected, payment_method, wallet_applied_iqd, status")
-        .eq("status", "delivered").eq("payment_collected", false);
-      // Cash the driver still owes: full total for cash orders, only the
-      // cash remainder for partially wallet-paid orders.
-      const owedAmt = (data ?? []).reduce((s: number, r: any) => {
-        const cashPart = r.total_iqd - (r.payment_method === "wallet" ? (r.wallet_applied_iqd ?? 0) : 0);
-        return s + Math.max(0, cashPart - (r.delivery_fee_iqd ?? 0));
-      }, 0);
-      return { count: (data ?? []).length, amount: owedAmt };
+      const [{ data: summary, error }, { count }] = await Promise.all([
+        (supabase.rpc as any)("driver_delivery_summary", { _tenant_id: tenantId }),
+        (supabase.from("driver_orders_history_view") as any)
+          .select("id", { count: "exact", head: true }).eq("status", "delivered").eq("payment_collected", false),
+      ]);
+      if (error) throw error;
+      const row = Array.isArray(summary) ? summary[0] : summary;
+      return { count: count ?? 0, amount: row?.cash_due_iqd ?? 0 };
     },
     refetchInterval: 15000,
   });
@@ -320,6 +349,8 @@ function DriverCashPanel({ tenantId }: { tenantId: string }) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["driver-my-settlements"] });
+      qc.invalidateQueries({ queryKey: ["driver-owed"] });
+      qc.invalidateQueries({ queryKey: ["driver-delivery-summary"] });
       setAmount(""); setNote("");
       toast.success("تم إرسال طلب التسديد للمطعم للموافقة");
     },
@@ -333,7 +364,7 @@ function DriverCashPanel({ tenantId }: { tenantId: string }) {
       </h3>
       {owed && owed.count > 0 && (
         <div className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-          عليك <b>{new Intl.NumberFormat("ar-IQ").format(owed.amount)} د.ع</b> من <b>{owed.count}</b> طلب لم يُحدَّد كمُحصَّل بعد.
+          عليك <b>{new Intl.NumberFormat("ar-IQ").format(owed.amount)} د.ع</b> من <b>{owed.count}</b> طلب. التسديد الجزئي يُخصم فقط من المبلغ الذي دفعته.
         </div>
       )}
       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

@@ -107,5 +107,13 @@ export async function requestNotificationPermission() {
 export function showNotification(title: string, body?: string) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
-  try { new Notification(title, { body, icon: "/favicon.png" }); } catch { /* noop */ }
+  const options = { body, icon: "/favicon.png", badge: "/favicon.png" };
+  try {
+    // Service-worker notifications remain visible while the PWA is in the background.
+    if (navigator.serviceWorker?.ready) {
+      void navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, options));
+      return;
+    }
+    new Notification(title, options);
+  } catch { /* noop */ }
 }

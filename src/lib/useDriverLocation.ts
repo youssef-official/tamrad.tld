@@ -41,6 +41,12 @@ export function useDriverLocationTracker({
             heading: pos.coords.heading ?? null,
             updated_at: new Date().toISOString(),
           });
+          await (supabase.from("driver_location_points") as any).insert({
+            driver_id: driverId,
+            tenant_id: tenantId,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
           setLastUpdate(new Date());
         } catch {
           setStatus("error");

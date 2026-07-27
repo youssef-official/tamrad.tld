@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/tamrad-logo.png";
-import { LogOut, Menu, X } from "lucide-react";
+import { Bell, CheckCheck, LogOut, Menu, X } from "lucide-react";
 import { useState, type ComponentType, type ReactNode } from "react";
 
 export type NavItem = {
@@ -115,6 +115,7 @@ export function DashboardShell({
             {headerExtra && <div className="ms-2">{headerExtra}</div>}
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <div className="hidden text-right sm:block">
               <div className="text-sm font-bold">{user?.name ?? "—"}</div>
               <div className="text-xs text-muted-foreground">{user?.email}</div>
@@ -127,6 +128,71 @@ export function DashboardShell({
 
         <div className="p-6 lg:p-10">{children}</div>
       </main>
+    </div>
+  );
+}
+
+function NotificationBell() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => { if (active) setUserId(data.user?.id ?? null); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const load = async () => {
+      const { data } = await (supabase.from("notification_queue") as any)
+        .select("id, title, body, data, created_at, read_at")
+        .eq("user_id", userId).order("created_at", { ascending: false }).limit(12);
+      setItems(data ?? []);
+    };
+    void load();
+    const channel = supabase.channel(`notification-bell-${userId}`).on(
+      "postgres_changes", { event: "INSERT", schema: "public", table: "notification_queue", filter: `user_id=eq.${userId}` },
+      () => void load(),
+    ).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
+  const unread = items.filter((item) => !item.read_at).length;
+  const markAllRead = async () => {
+    if (!userId || unread === 0) return;
+    await (supabase.from("notification_queue") as any)
+      .update({ read_at: new Date().toISOString() }).eq("user_id", userId).is("read_at", null);
+    setItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+  };
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((value) => !value)} aria-label="الإشعارات" className="relative rounded-xl border border-border bg-card p-2 text-foreground hover:bg-muted">
+        <Bell className="h-4 w-4" />
+        {unread > 0 && <span className="absolute -left-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-black leading-4 text-destructive-foreground">{unread > 99 ? "99+" : unread}</span>}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-11 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+            <span className="font-black">الإشعارات</span>
+            <button onClick={markAllRead} disabled={!unread} className="inline-flex items-center gap-1 text-xs font-bold text-primary disabled:opacity-40"><CheckCheck className="h-3.5 w-3.5" /> قراءة الكل</button>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {items.length === 0 ? <p className="p-5 text-center text-xs text-muted-foreground">لا توجد إشعارات بعد.</p> : items.map((item) => (
+              <button key={item.id} onClick={async () => {
+                if (!item.read_at) await (supabase.from("notification_queue") as any).update({ read_at: new Date().toISOString() }).eq("id", item.id);
+                setItems((current) => current.map((row) => row.id === item.id ? { ...row, read_at: new Date().toISOString() } : row));
+                const url = item.data?.url;
+                if (typeof url === "string" && url.startsWith("/")) window.location.assign(url);
+              }} className={`block w-full border-b border-border px-3 py-3 text-right hover:bg-muted/60 ${item.read_at ? "" : "bg-primary/5"}`}>
+                <div className="text-sm font-bold">{item.title}</div><div className="mt-0.5 text-xs text-muted-foreground">{item.body}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
