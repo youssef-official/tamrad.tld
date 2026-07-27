@@ -9,15 +9,25 @@ type NotificationRecord = {
   data?: Record<string, unknown>;
 };
 
-const corsHeaders = { "Content-Type": "application/json" };
+const corsHeaders = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+  // The public VAPID key is safe to expose and lets the browser subscribe
+  // without a separate frontend-hosting environment variable.
+  if (request.method === "GET") {
+    return Response.json({ publicKey: publicKey ?? null }, { headers: corsHeaders });
+  }
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
   if (request.headers.get("x-webhook-secret") !== Deno.env.get("WEB_PUSH_WEBHOOK_SECRET")) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
   const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
   const subject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:notifications@tamrad.app";
   if (!publicKey || !privateKey) return Response.json({ error: "VAPID is not configured" }, { status: 500, headers: corsHeaders });
@@ -28,10 +38,10 @@ Deno.serve(async (request) => {
     return Response.json({ error: "Invalid notification payload" }, { status: 400, headers: corsHeaders });
   }
 
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  );
+  const keySet = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? keySet.default;
+  if (!serviceRoleKey) return Response.json({ error: "Service key is not configured" }, { status: 500, headers: corsHeaders });
+  const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceRoleKey);
   webpush.setVapidDetails(subject, publicKey, privateKey);
 
   const { data: subscriptions, error } = await admin

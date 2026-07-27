@@ -8,7 +8,11 @@ function base64UrlToUint8Array(value: string) {
 }
 
 export async function subscribeToWebPush(userId: string): Promise<{ ok: boolean; message: string }> {
-  const publicKey = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY?.trim();
+  let publicKey = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY?.trim();
+  if (!publicKey) {
+    const { data, error } = await supabase.functions.invoke("send-web-push", { method: "GET" });
+    if (!error && typeof data?.publicKey === "string") publicKey = data.publicKey;
+  }
   if (!publicKey) return { ok: false, message: "الإشعارات الخارجية لم تُفعّل على الخادم بعد." };
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
     return { ok: false, message: "هذا المتصفح لا يدعم الإشعارات الخارجية." };
