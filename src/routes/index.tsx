@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getTenantIdentifierFromHost } from "@/lib/domain";
+import { supabase } from "@/integrations/supabase/client";
 import { RestaurantPage } from "./r.$slug";
 import logo from "@/assets/tamrad-logo.png";
 import {
@@ -46,16 +47,30 @@ function IndexPage() {
 }
 
 function LandingPage() {
+  const [restaurantCount, setRestaurantCount] = useState(120);
+
+  useEffect(() => {
+    let active = true;
+    (supabase.from("platform_settings") as any)
+      .select("restaurant_count")
+      .eq("singleton", true)
+      .maybeSingle()
+      .then(({ data }: { data: { restaurant_count?: number } | null }) => {
+        if (active && Number.isInteger(data?.restaurant_count)) setRestaurantCount(data.restaurant_count!);
+      });
+    return () => { active = false; };
+  }, []);
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <Nav />
       <Hero />
-      <TrustBar />
+      <TrustBar restaurantCount={restaurantCount} />
       <Features />
       <HowItWorks />
       <Platforms />
       <WhyTamrad />
-      <CTA />
+      <CTA restaurantCount={restaurantCount} />
       <Footer />
     </div>
   );
@@ -259,7 +274,7 @@ function StatCard({ label, value, trend }: { label: string; value: string; trend
   );
 }
 
-function TrustBar() {
+function TrustBar({ restaurantCount }: { restaurantCount: number }) {
   return (
     <section className="border-y border-border/40 bg-card/40">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-6 py-6">
@@ -274,7 +289,7 @@ function TrustBar() {
             ))}
           </div>
           <div>
-            <div className="text-lg font-black">+120 مطعماً</div>
+            <div className="text-lg font-black">+{restaurantCount.toLocaleString("en-US")} مطعماً</div>
             <div className="text-xs text-muted-foreground">
               يستقلون عن المنصات الكبرى
             </div>
@@ -365,7 +380,7 @@ function HowItWorks() {
     {
       num: "02",
       title: "أطلق تطبيقك",
-      body: "نطاق باسم مطعمك (name.tamrad.shop) أو نطاقك الخاص. جاهز للزبائن مباشرة.",
+      body: "نطاق باسم مطعمك (name.mrt.llc) أو نطاقك الخاص. جاهز للزبائن مباشرة.",
     },
     {
       num: "03",
@@ -517,7 +532,7 @@ function WhyTamrad() {
   );
 }
 
-function CTA() {
+function CTA({ restaurantCount }: { restaurantCount: number }) {
   return (
     <section id="start" className="mx-auto max-w-7xl px-6 pb-24">
       <div
@@ -539,7 +554,7 @@ function CTA() {
             منصتك؟
           </h2>
           <p className="mt-6 text-lg leading-relaxed text-primary-foreground/80">
-            انضم لأكثر من 120 مطعماً استعادوا استقلاليتهم مع تمراد.
+            انضم لأكثر من {restaurantCount.toLocaleString("en-US")} مطعماً استعادوا استقلاليتهم مع تمراد.
           </p>
           <div className="mt-10 flex flex-wrap gap-4">
             <a

@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, notFound } from "@tanstack/react-router";
 import { DashboardShell } from "@/components/DashboardShell";
 import { useMe } from "@/lib/useMe";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Store, Users, MessageSquare, Search } from "lucide-react";
+import { LayoutDashboard, Store, Users, MessageSquare, Search, Settings } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -26,6 +26,7 @@ const NAV = [
   { label: "المستخدمون", to: "/admin/users", icon: Users },
   { label: "مراقبة الدردشات", to: "/admin/chat-monitor", icon: MessageSquare },
   { label: "البحث الشامل", to: "/admin/search", icon: Search },
+  { label: "إعدادات المنصة", to: "/admin/platform", icon: Settings },
 ];
 
 function AdminLayout() {

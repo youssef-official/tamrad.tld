@@ -41,6 +41,7 @@ import { Route as AuthenticatedDashboardBroadcastRouteImport } from './routes/_a
 import { Route as AuthenticatedDashboardBranchesRouteImport } from './routes/_authenticated/dashboard.branches'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSearchRouteImport } from './routes/_authenticated/admin.search'
+import { Route as AuthenticatedAdminPlatformRouteImport } from './routes/_authenticated/admin.platform'
 import { Route as AuthenticatedAdminChatMonitorRouteImport } from './routes/_authenticated/admin.chat-monitor'
 import { Route as AuthenticatedAccountAddressesRouteImport } from './routes/_authenticated/account.addresses'
 import { Route as AuthenticatedAdminTenantsIndexRouteImport } from './routes/_authenticated/admin.tenants.index'
@@ -225,6 +226,12 @@ const AuthenticatedAdminSearchRoute =
     path: '/search',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPlatformRoute =
+  AuthenticatedAdminPlatformRouteImport.update({
+    id: '/platform',
+    path: '/platform',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminChatMonitorRoute =
   AuthenticatedAdminChatMonitorRouteImport.update({
     id: '/chat-monitor',
@@ -280,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/r/$slug': typeof RSlugRoute
   '/account/addresses': typeof AuthenticatedAccountAddressesRoute
   '/admin/chat-monitor': typeof AuthenticatedAdminChatMonitorRoute
+  '/admin/platform': typeof AuthenticatedAdminPlatformRoute
   '/admin/search': typeof AuthenticatedAdminSearchRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/dashboard/branches': typeof AuthenticatedDashboardBranchesRoute
@@ -318,6 +326,7 @@ export interface FileRoutesByTo {
   '/r/$slug': typeof RSlugRoute
   '/account/addresses': typeof AuthenticatedAccountAddressesRoute
   '/admin/chat-monitor': typeof AuthenticatedAdminChatMonitorRoute
+  '/admin/platform': typeof AuthenticatedAdminPlatformRoute
   '/admin/search': typeof AuthenticatedAdminSearchRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/dashboard/branches': typeof AuthenticatedDashboardBranchesRoute
@@ -360,6 +369,7 @@ export interface FileRoutesById {
   '/r/$slug': typeof RSlugRoute
   '/_authenticated/account/addresses': typeof AuthenticatedAccountAddressesRoute
   '/_authenticated/admin/chat-monitor': typeof AuthenticatedAdminChatMonitorRoute
+  '/_authenticated/admin/platform': typeof AuthenticatedAdminPlatformRoute
   '/_authenticated/admin/search': typeof AuthenticatedAdminSearchRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/dashboard/branches': typeof AuthenticatedDashboardBranchesRoute
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/r/$slug'
     | '/account/addresses'
     | '/admin/chat-monitor'
+    | '/admin/platform'
     | '/admin/search'
     | '/admin/users'
     | '/dashboard/branches'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/r/$slug'
     | '/account/addresses'
     | '/admin/chat-monitor'
+    | '/admin/platform'
     | '/admin/search'
     | '/admin/users'
     | '/dashboard/branches'
@@ -481,6 +493,7 @@ export interface FileRouteTypes {
     | '/r/$slug'
     | '/_authenticated/account/addresses'
     | '/_authenticated/admin/chat-monitor'
+    | '/_authenticated/admin/platform'
     | '/_authenticated/admin/search'
     | '/_authenticated/admin/users'
     | '/_authenticated/dashboard/branches'
@@ -744,6 +757,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSearchRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/platform': {
+      id: '/_authenticated/admin/platform'
+      path: '/platform'
+      fullPath: '/admin/platform'
+      preLoaderRoute: typeof AuthenticatedAdminPlatformRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/chat-monitor': {
       id: '/_authenticated/admin/chat-monitor'
       path: '/chat-monitor'
@@ -809,6 +829,7 @@ const AuthenticatedAccountRouteWithChildren =
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminChatMonitorRoute: typeof AuthenticatedAdminChatMonitorRoute
+  AuthenticatedAdminPlatformRoute: typeof AuthenticatedAdminPlatformRoute
   AuthenticatedAdminSearchRoute: typeof AuthenticatedAdminSearchRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -818,6 +839,7 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminChatMonitorRoute: AuthenticatedAdminChatMonitorRoute,
+  AuthenticatedAdminPlatformRoute: AuthenticatedAdminPlatformRoute,
   AuthenticatedAdminSearchRoute: AuthenticatedAdminSearchRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
