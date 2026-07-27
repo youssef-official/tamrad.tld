@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { subscribeToWebPush } from "@/lib/webPush";
 import logo from "@/assets/tamrad-logo.png";
 import { Bell, CheckCheck, LogOut, Menu, X } from "lucide-react";
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 export type NavItem = {
   label: string;
