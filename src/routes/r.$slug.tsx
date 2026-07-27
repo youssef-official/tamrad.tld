@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getTemplate, type Cart } from "@/lib/restaurantTemplates";
 import { LoyaltyBadge } from "@/components/LoyaltyBadge";
+import { subscribeToWebPush } from "@/lib/webPush";
 import { StorefrontAuthDialog } from "@/components/StorefrontAuthDialog";
 import { ModifierPicker, type PickedModifier } from "@/components/ModifierPicker";
 import { useInstallPrompt } from "@/lib/pwa-install";
@@ -134,6 +135,8 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   const [pickerFor, setPickerFor] = useState<{ id: string; name: string; price: number } | null>(
     null,
@@ -741,7 +744,7 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
       )}
 
       {/* Top Floating Notification Bell */}
-      {broadcasts.length > 0 && (
+      {(broadcasts.length > 0 || isSignedIn) && (
         <button
           onClick={() => setShowNotifications(true)}
           className="fixed top-4 left-4 z-30 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow transition hover:scale-105"
@@ -794,6 +797,24 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
                 </div>
               ))}
             </div>
+
+            {isSignedIn && (
+              <div className="mt-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
+                <button
+                  onClick={async () => {
+                    if (!me?.user.id) return;
+                    setPushBusy(true);
+                    const result = await subscribeToWebPush(me.user.id);
+                    setPushMessage(result.message);
+                    setPushBusy(false);
+                  }}
+                  disabled={pushBusy}
+                  className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-60"
+                  style={{ background: primary }}
+                >{pushBusy ? "جاري التفعيل..." : "تفعيل إشعارات خارج التطبيق"}</button>
+                {pushMessage && <p className="mt-2 text-center text-xs text-neutral-500">{pushMessage}</p>}
+              </div>
+            )}
 
             <button
               onClick={() => setShowNotifications(false)}

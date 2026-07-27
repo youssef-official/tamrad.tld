@@ -1,6 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeToWebPush } from "@/lib/webPush";
 import logo from "@/assets/tamrad-logo.png";
 import { Bell, CheckCheck, LogOut, Menu, X } from "lucide-react";
 import { useState, type ComponentType, type ReactNode } from "react";
@@ -136,6 +137,8 @@ function NotificationBell() {
   const [userId, setUserId] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -166,6 +169,13 @@ function NotificationBell() {
       .update({ read_at: new Date().toISOString() }).eq("user_id", userId).is("read_at", null);
     setItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
   };
+  const enablePush = async () => {
+    if (!userId) return;
+    setPushBusy(true);
+    const result = await subscribeToWebPush(userId);
+    setPushMessage(result.message);
+    setPushBusy(false);
+  };
 
   return (
     <div className="relative">
@@ -190,6 +200,12 @@ function NotificationBell() {
                 <div className="text-sm font-bold">{item.title}</div><div className="mt-0.5 text-xs text-muted-foreground">{item.body}</div>
               </button>
             ))}
+          </div>
+          <div className="border-t border-border p-3">
+            <button onClick={enablePush} disabled={pushBusy} className="w-full rounded-xl border border-primary/30 bg-primary/5 py-2 text-xs font-bold text-primary hover:bg-primary/10 disabled:opacity-50">
+              {pushBusy ? "جاري التفعيل..." : "تفعيل إشعارات خارج التطبيق"}
+            </button>
+            {pushMessage && <p className="mt-2 text-center text-[11px] text-muted-foreground">{pushMessage}</p>}
           </div>
         </div>
       )}
