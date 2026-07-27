@@ -192,7 +192,8 @@ export function OrderChat({
 function MessageBody({ content, mine }: { content: string; mine: boolean }) {
   const loc = content.match(/^📍LOC:(-?\d+\.?\d*),(-?\d+\.?\d*)$/);
   if (loc) {
-    const url = `https://www.google.com/maps?q=${loc[1]},${loc[2]}`;
+    // Open shared coordinates as the destination, not as a generic map search.
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${loc[1]},${loc[2]}`;
     return (
       <a
         href={url}
@@ -203,7 +204,7 @@ function MessageBody({ content, mine }: { content: string; mine: boolean }) {
         }`}
       >
         <Navigation className="h-3.5 w-3.5" />
-        فتح الموقع المشارك على الخريطة ←
+        افتح الموقع المشارك كوجهة ←
       </a>
     );
   }

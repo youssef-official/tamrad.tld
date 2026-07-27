@@ -981,6 +981,8 @@ export type Database = {
           customer_phone: string | null
           delivered_at: string | null
           delivery_fee_iqd: number
+          delivery_lat: number | null
+          delivery_lng: number | null
           discount_iqd: number
           driver_id: string | null
           id: string
@@ -1005,6 +1007,8 @@ export type Database = {
           customer_phone?: string | null
           delivered_at?: string | null
           delivery_fee_iqd?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           discount_iqd?: number
           driver_id?: string | null
           id?: string
@@ -1029,6 +1033,8 @@ export type Database = {
           customer_phone?: string | null
           delivered_at?: string | null
           delivery_fee_iqd?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           discount_iqd?: number
           driver_id?: string | null
           id?: string

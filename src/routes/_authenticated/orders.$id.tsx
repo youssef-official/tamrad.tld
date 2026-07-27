@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatIQD, useMe } from "@/lib/useMe";
-import { CheckCircle2, Clock, Bike, ChefHat, Package, XCircle, Star, LifeBuoy, Navigation, RotateCcw } from "lucide-react";
+import { CheckCircle2, Clock, Bike, ChefHat, Package, XCircle, Star, LifeBuoy, Navigation, RotateCcw, Phone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { OrderChat } from "@/components/OrderChat";
@@ -22,6 +22,16 @@ const STEPS: { key: OrderStatus; label: string; icon: React.ComponentType<{ clas
   { key: "on_the_way", label: "في الطريق", icon: Bike },
   { key: "delivered", label: "تم التسليم", icon: Package },
 ];
+
+function customerNavigationUrl(latitude: number | null, longitude: number | null) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+}
+
+function telUrl(phone: string | null) {
+  const normalized = phone?.replace(/[^\d+]/g, "") ?? "";
+  return normalized ? `tel:${normalized}` : null;
+}
 
 function OrderTracking() {
   const { id } = Route.useParams();
@@ -56,6 +66,7 @@ function OrderTracking() {
   const status = order.status as OrderStatus;
   const cancelled = status === "cancelled" || status === "rejected";
   const currentIdx = STEPS.findIndex((s) => s.key === status);
+  const destinationUrl = customerNavigationUrl(order.delivery_lat, order.delivery_lng);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -110,8 +121,31 @@ function OrderTracking() {
 
           <div className="mt-6 rounded-2xl bg-muted/40 p-4 text-sm">
             <div className="mb-2 font-bold">تفاصيل التوصيل</div>
-            {order.customer_address && <p className="text-muted-foreground">{order.customer_address}</p>}
+            {order.customer_address && (
+              destinationUrl ? (
+                <a
+                  href={destinationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2 text-muted-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="فتح عنوان التوصيل في الخريطة"
+                >
+                  <Navigation className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="break-words underline decoration-primary/40 underline-offset-4">{order.customer_address}</span>
+                </a>
+              ) : <p className="break-words text-muted-foreground">{order.customer_address}</p>
+            )}
             {order.customer_phone && <p dir="ltr" className="text-muted-foreground">{order.customer_phone}</p>}
+            {destinationUrl && (
+              <a
+                href={destinationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Navigation className="h-3.5 w-3.5" /> افتح وجهة الزبون على الخريطة ←
+              </a>
+            )}
           </div>
 
           {order.driver_id && !cancelled && (
@@ -159,11 +193,13 @@ function DriverCard({ orderId, driverId }: { orderId: string; driverId: string }
     queryKey: ["order-driver-info", orderId],
     queryFn: async () => {
       const { data } = await (supabase.rpc as any)("get_order_driver_info", { _order_id: orderId });
-      return data?.ok ? (data as { driver_name: string | null; transferred: boolean; transferred_at: string | null }) : null;
+      return data?.ok ? (data as { driver_name: string | null; driver_phone: string | null; transferred: boolean; transferred_at: string | null }) : null;
     },
   });
 
   if (!info?.driver_name) return null;
+
+  const driverTel = telUrl(info.driver_phone);
 
   return (
     <div className="mt-6 rounded-2xl border border-primary/30 bg-primary/5 p-4">
@@ -171,9 +207,19 @@ function DriverCard({ orderId, driverId }: { orderId: string; driverId: string }
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
           <Bike className="h-5 w-5" />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="text-[11px] text-muted-foreground">المندوب المسؤول عن طلبك</div>
-          <div className="text-base font-black">{info.driver_name}</div>
+          {driverTel ? (
+            <a
+              href={driverTel}
+              className="inline-flex max-w-full items-center gap-1.5 text-base font-black text-primary underline decoration-primary/40 underline-offset-4 transition hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label={`اتصل بالمندوب ${info.driver_name}`}
+            >
+              <span className="truncate">{info.driver_name}</span>
+              <Phone className="h-3.5 w-3.5 shrink-0" />
+            </a>
+          ) : <div className="truncate text-base font-black">{info.driver_name}</div>}
+          {driverTel && <div className="mt-0.5 text-[10px] text-muted-foreground">اضغط على الاسم للاتصال</div>}
         </div>
       </div>
       {info.transferred && (

@@ -44,6 +44,8 @@ type Order = {
   delivery_fee_iqd: number;
   customer_phone: string | null;
   customer_address: string | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
   driver_id: string | null;
   created_at: string;
 };
@@ -81,7 +83,7 @@ function DriverPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, order_number, status, total_iqd, delivery_fee_iqd, customer_phone, customer_address, driver_id, created_at")
+        .select("id, order_number, status, total_iqd, delivery_fee_iqd, customer_phone, customer_address, delivery_lat, delivery_lng, driver_id, created_at")
         .eq("driver_id", me!.user.id)
         .in("status", ["on_the_way"])
         .order("created_at", { ascending: false });
@@ -450,6 +452,10 @@ function OrderCard({
 }: {
   o: Order; actionLabel: string; onAction: () => void; onChat: () => void; chatOpen: boolean; highlight?: boolean;
 }) {
+  const destinationUrl = Number.isFinite(o.delivery_lat) && Number.isFinite(o.delivery_lng)
+    ? `https://www.google.com/maps/dir/?api=1&destination=${o.delivery_lat},${o.delivery_lng}`
+    : null;
+
   return (
     <div className={`rounded-2xl border p-5 shadow-[var(--shadow-soft)] ${
       highlight ? "border-primary bg-primary/5" : "border-border bg-card"
@@ -466,11 +472,22 @@ function OrderCard({
         </div>
       </div>
       <div className="space-y-1 text-sm text-muted-foreground">
-        {o.customer_address && (
-          <div className="flex items-center gap-2">
+        {o.customer_address && (destinationUrl ? (
+          <a
+            href={destinationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-2 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="فتح وجهة الزبون على الخريطة"
+          >
             <MapPin className="h-3.5 w-3.5" />
-            <span>{o.customer_address}</span>
-          </div>
+            <span className="break-words">{o.customer_address}</span>
+          </a>
+        ) : <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="break-words">{o.customer_address}</span></div>)}
+        {destinationUrl && (
+          <a href={destinationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <Navigation className="h-3.5 w-3.5" /> ابدأ الملاحة إلى الزبون ←
+          </a>
         )}
         {o.customer_phone && (
           <a href={`tel:${o.customer_phone}`} className="flex items-center gap-2 text-primary hover:underline">
