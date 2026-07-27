@@ -198,6 +198,10 @@ function TenantDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <SubdomainCard
+            tenant={tenant}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })}
+          />
           <SubscriptionCard
             tenant={tenant}
             onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })}
@@ -343,6 +347,76 @@ function TenantDetailPage() {
         </div>
       </div>
     </>
+  );
+}
+
+function SubdomainCard({ tenant, onSaved }: { tenant: any; onSaved: () => void }) {
+  const [slug, setSlug] = useState<string>(tenant.slug);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const nextSlug = slug
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+      if (nextSlug.length < 2) throw new Error("اكتب Subdomain صالحاً من حرفين على الأقل");
+      const { error } = await (supabase.from("tenants") as any)
+        .update({ slug: nextSlug })
+        .eq("id", tenant.id);
+      if (error) {
+        if (error.code === "23505") throw new Error("هذا الـ Subdomain مستخدم بالفعل لمطعم آخر");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("تم تحديث الـ Subdomain");
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const hasChanged = slug.trim().toLowerCase() !== tenant.slug;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black">رابط المطعم</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            يمكن للمشرف تغييره في أي وقت. الرابط السابق سيتوقف بعد الحفظ.
+          </p>
+        </div>
+        <a
+          href={getTenantStorefrontUrl(tenant.slug, tenant.custom_domain)}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-xs font-bold text-primary hover:underline"
+        >
+          فتح الرابط
+        </a>
+      </div>
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-bold">Subdomain</span>
+        <div dir="ltr" className="flex items-center gap-2">
+          <input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="restaurant-name"
+            className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+          />
+          <span className="shrink-0 text-xs text-muted-foreground">.mrt.llc</span>
+        </div>
+      </label>
+      <button
+        onClick={() => save.mutate()}
+        disabled={!hasChanged || save.isPending}
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Save className="h-4 w-4" /> حفظ الـ Subdomain
+      </button>
+    </div>
   );
 }
 
