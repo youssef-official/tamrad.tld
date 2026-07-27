@@ -122,7 +122,6 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [notes, setNotes] = useState("");
-  const [zoneId, setZoneId] = useState("");
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -383,7 +382,38 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
     };
   }, [cart]);
 
-  const zone = data?.zones.find((z) => z.id === zoneId);
+  const zone = useMemo(() => {
+    if (!selectedAddress?.latitude || !selectedAddress?.longitude) return null;
+    return (
+      data?.zones.find((candidate: any) => {
+        if (candidate.shape_type === "polygon") {
+          const points = candidate.polygon_points as Array<{ lat: number; lng: number }> | null;
+          if (!points || points.length < 3) return false;
+          let inside = false;
+          for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+            const a = points[i];
+            const b = points[j];
+            if (
+              a.lng > selectedAddress.longitude! !== b.lng > selectedAddress.longitude! &&
+              selectedAddress.latitude! <
+                ((b.lat - a.lat) * (selectedAddress.longitude! - a.lng)) / (b.lng - a.lng) + a.lat
+            )
+              inside = !inside;
+          }
+          return inside;
+        }
+        return (
+          candidate.center_lat != null &&
+          candidate.center_lng != null &&
+          candidate.radius_km != null &&
+          haversineKm(
+            { lat: selectedAddress.latitude!, lng: selectedAddress.longitude! },
+            { lat: candidate.center_lat, lng: candidate.center_lng },
+          ) <= candidate.radius_km
+        );
+      }) ?? null
+    );
+  }, [data?.zones, selectedAddress]);
   const deliveryFee = zone?.fee_iqd ?? 0;
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
@@ -397,9 +427,7 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
     !walletBalanceLoading && walletBalance != null && walletBalance > 0 && grandTotal > 0;
   // Partial application: any available balance is used, the rest is cash on delivery.
   const walletApplied =
-    paymentMethod === "wallet" && walletBalance != null
-      ? Math.min(walletBalance, grandTotal)
-      : 0;
+    paymentMethod === "wallet" && walletBalance != null ? Math.min(walletBalance, grandTotal) : 0;
   const cashDue = grandTotal - walletApplied;
 
   // If the wallet option was selected but the balance is gone (e.g. spent in
@@ -535,48 +563,20 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
       setError("المطعم لا يقبل طلبات جديدة حالياً.");
       return;
     }
-    if (data.zones.length > 0 && !zoneId) {
-      setError("اختر منطقة التوصيل أولاً.");
+    if (
+      data.zones.length > 0 &&
+      (selectedAddress.latitude == null || selectedAddress.longitude == null)
+    ) {
+      setError("فعّل GPS عند إضافة العنوان حتى نتحقق من منطقة التوصيل.");
+      return;
+    }
+    if (data.zones.length > 0 && !zone) {
+      setError("عنوانك خارج مناطق التوصيل المتاحة لهذا المطعم.");
       return;
     }
     if (branches.length > 0 && !currentBranch) {
       setError("اختر الفرع أولاً.");
       return;
-    }
-
-    // Geo-fence check: if selected zone has geo bounds, verify customer location
-    const selectedZone: any = zone;
-    if (
-      selectedZone &&
-      selectedZone.center_lat != null &&
-      selectedZone.center_lng != null &&
-      selectedZone.radius_km != null
-    ) {
-      if (!navigator.geolocation) {
-        setError("يجب تفعيل تحديد الموقع في المتصفح لإتمام الطلب.");
-        return;
-      }
-      try {
-        const pos = await new Promise<GeolocationPosition>((res, rej) =>
-          navigator.geolocation.getCurrentPosition(res, rej, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-          }),
-        );
-        const dist = haversineKm(
-          { lat: pos.coords.latitude, lng: pos.coords.longitude },
-          { lat: selectedZone.center_lat, lng: selectedZone.center_lng },
-        );
-        if (dist > selectedZone.radius_km) {
-          setError(
-            `عذراً، أنت خارج نطاق التوصيل (${dist.toFixed(1)}كم بعيد عن مركز المنطقة). يرجى الاتصال بالمطعم.`,
-          );
-          return;
-        }
-      } catch {
-        setError("لم نتمكن من التحقق من موقعك. فعّل GPS وحاول مجدداً.");
-        return;
-      }
     }
 
     setSubmitting(true);
@@ -619,7 +619,9 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
         discount_iqd: discount,
         delivery_fee_iqd: deliveryFee,
         coupon_code: appliedCoupon?.code ?? null,
-        zone_id: zoneId || null,
+        zone_id: zone?.id ?? null,
+        delivery_lat: selectedAddress.latitude,
+        delivery_lng: selectedAddress.longitude,
         branch_id: currentBranch?.id ?? null,
       };
       const { data: created, error: err } = await supabase
@@ -1054,22 +1056,20 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
                 </div>
 
                 {data.zones.length > 0 && (
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-bold">منطقة التوصيل *</span>
-                    <select
-                      value={zoneId}
-                      onChange={(e) => setZoneId(e.target.value)}
-                      required
-                      className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary"
-                    >
-                      <option value="">— اختر —</option>
-                      {data.zones.map((z: any) => (
-                        <option key={z.id} value={z.id}>
-                          {z.name} · {z.fee_iqd === 0 ? "مجاني" : formatIQD(z.fee_iqd)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div
+                    className={`rounded-xl border p-3 text-sm ${zone ? "border-green-500/30 bg-green-50" : "border-amber-500/30 bg-amber-50"}`}
+                  >
+                    <div className="font-bold">
+                      {zone ? `منطقة التوصيل: ${zone.name}` : "تحقق من منطقة التوصيل"}
+                    </div>
+                    <div className="mt-1 text-xs text-neutral-600">
+                      {zone
+                        ? zone.fee_iqd === 0
+                          ? "التوصيل مجاني لهذا العنوان"
+                          : `رسوم التوصيل: ${formatIQD(zone.fee_iqd)}`
+                        : "اختر عنواناً محفوظاً بموقع GPS أو أضف عنواناً جديداً ثم فعّل موقعك."}
+                    </div>
+                  </div>
                 )}
 
                 <div>
@@ -1174,12 +1174,14 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
                       </button>
                     </div>
                     {walletBalanceLoading ? (
-                      <p className="mt-1.5 text-xs text-neutral-400">جاري تحميل رصيد محفظتك لهذا المطعم…</p>
+                      <p className="mt-1.5 text-xs text-neutral-400">
+                        جاري تحميل رصيد محفظتك لهذا المطعم…
+                      </p>
                     ) : walletBalance == null ? null : paymentMethod === "wallet" ? (
                       cashDue > 0 ? (
                         <p className="mt-1.5 text-xs text-neutral-500">
-                          سيُخصم {formatIQD(walletApplied)} من محفظتك — والباقي{" "}
-                          {formatIQD(cashDue)} نقداً عند الاستلام.
+                          سيُخصم {formatIQD(walletApplied)} من محفظتك — والباقي {formatIQD(cashDue)}{" "}
+                          نقداً عند الاستلام.
                         </p>
                       ) : (
                         <p className="mt-1.5 text-xs text-neutral-500">
