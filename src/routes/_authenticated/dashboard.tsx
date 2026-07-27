@@ -1,14 +1,41 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { createFileRoute, Outlet, notFound } from "@tanstack/react-router";
 import { DashboardShell } from "@/components/DashboardShell";
 import { BranchSwitcher } from "@/components/BranchSwitcher";
 import { useMe } from "@/lib/useMe";
-import { ensureOwnerRestaurant } from "@/lib/owner-setup.functions";
-import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Settings, Store, Tag, Map, BarChart3, Wallet, Bike, Palette, Star, LifeBuoy, Gift, History, Bell } from "lucide-react";
-import { useEffect } from "react";
+import {
+  LayoutDashboard,
+  UtensilsCrossed,
+  ShoppingBag,
+  Settings,
+  Store,
+  Tag,
+  Map,
+  BarChart3,
+  Wallet,
+  Bike,
+  Palette,
+  Star,
+  LifeBuoy,
+  Gift,
+  History,
+  Bell,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  beforeLoad: async () => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) throw notFound();
+    const { data } = await supabase
+      .from("user_roles")
+      .select("tenant_id")
+      .eq("user_id", uid)
+      .eq("role", "owner")
+      .not("tenant_id", "is", null)
+      .maybeSingle();
+    if (!data?.tenant_id) throw notFound();
+  },
   component: DashboardLayout,
 });
 
@@ -32,44 +59,12 @@ const NAV = [
 ];
 
 function DashboardLayout() {
-  const queryClient = useQueryClient();
-  const setupOwner = useServerFn(ensureOwnerRestaurant);
   const { data: me, isLoading } = useMe();
 
-  const setup = useMutation({
-    mutationFn: async () => setupOwner(),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      await queryClient.invalidateQueries({ queryKey: ["branches"] });
-    },
-  });
-
-  useEffect(() => {
-    if (isLoading || !me || me.tenantId || setup.isPending || setup.isSuccess || setup.isError) return;
-    setup.mutate();
-  }, [isLoading, me, setup]);
-
-  if (isLoading || setup.isPending) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
         جاري التحميل...
-      </div>
-    );
-  }
-
-  if (setup.isError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
-        <div className="max-w-md rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
-          <h1 className="text-xl font-bold">تعذر تجهيز لوحة المطعم</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{setup.error.message}</p>
-          <button
-            onClick={() => setup.mutate()}
-            className="mt-5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-          >
-            حاول مجدداً
-          </button>
-        </div>
       </div>
     );
   }

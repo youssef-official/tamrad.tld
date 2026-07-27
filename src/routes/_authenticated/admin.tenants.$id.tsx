@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { getTenantStorefrontUrl } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/admin/tenants/$id")({
   component: TenantDetailPage,
@@ -123,7 +124,10 @@ function TenantDetailPage() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground">لم يتم العثور على هذا المطعم.</p>
-        <Link to="/admin/tenants" className="mt-4 inline-block text-sm font-bold text-primary hover:underline">
+        <Link
+          to="/admin/tenants"
+          className="mt-4 inline-block text-sm font-bold text-primary hover:underline"
+        >
           ← العودة للقائمة
         </Link>
       </div>
@@ -160,11 +164,11 @@ function TenantDetailPage() {
 
       <PageHeader
         title={tenant.name}
-        subtitle={`/r/${tenant.slug} • انضم في ${new Date(tenant.created_at).toLocaleDateString("ar-IQ")}`}
+        subtitle={`${tenant.slug}.mrt.llc • انضم في ${new Date(tenant.created_at).toLocaleDateString("ar-IQ")}`}
         action={
           <div className="flex gap-2">
             <a
-              href={`/r/${tenant.slug}`}
+              href={getTenantStorefrontUrl(tenant.slug, tenant.custom_domain)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
@@ -177,7 +181,12 @@ function TenantDetailPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={ShoppingBag} label="طلبات نشطة" value={activeOrders} tone="blue" />
-        <StatCard icon={TrendingUp} label="إجمالي الإيرادات" value={formatIQD(totalRevenue)} tone="green" />
+        <StatCard
+          icon={TrendingUp}
+          label="إجمالي الإيرادات"
+          value={formatIQD(totalRevenue)}
+          tone="green"
+        />
         <StatCard icon={Building2} label="الفروع" value={branches?.length ?? 0} tone="purple" />
         <StatCard
           icon={Star}
@@ -189,8 +198,14 @@ function TenantDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <SubscriptionCard tenant={tenant} onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })} />
-          <FeaturesCard tenant={tenant} onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })} />
+          <SubscriptionCard
+            tenant={tenant}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })}
+          />
+          <FeaturesCard
+            tenant={tenant}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["admin-tenant", id] })}
+          />
 
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="mb-4 flex items-center justify-between">
@@ -236,12 +251,21 @@ function TenantDetailPage() {
             {orders && orders.length > 0 ? (
               <div className="space-y-1.5">
                 {orders.slice(0, 15).map((o) => (
-                  <div key={o.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs">
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs"
+                  >
                     <span className={statusClass(o.status)}>{statusLabel(o.status)}</span>
                     <div className="text-right">
                       <div className="font-bold">{formatIQD(o.total_iqd)}</div>
                       <div className="text-[10px] text-muted-foreground">
-                        #{o.order_number} • {new Date(o.created_at).toLocaleString("ar-IQ", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                        #{o.order_number} •{" "}
+                        {new Date(o.created_at).toLocaleString("ar-IQ", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          day: "2-digit",
+                          month: "2-digit",
+                        })}
                       </div>
                     </div>
                   </div>
@@ -261,10 +285,15 @@ function TenantDetailPage() {
             <div className="space-y-2 text-sm">
               <InfoRow icon={Phone} value={tenant.phone ?? "—"} dir="ltr" />
               <InfoRow icon={MapPin} value={tenant.address ?? "—"} />
-              <InfoRow icon={Calendar} value={`منذ ${new Date(tenant.created_at).toLocaleDateString("ar-IQ")}`} />
+              <InfoRow
+                icon={Calendar}
+                value={`منذ ${new Date(tenant.created_at).toLocaleDateString("ar-IQ")}`}
+              />
             </div>
             {tenant.description && (
-              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{tenant.description}</p>
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                {tenant.description}
+              </p>
             )}
           </div>
 
@@ -289,13 +318,18 @@ function TenantDetailPage() {
             {staff && staff.length > 0 ? (
               <div className="space-y-2 text-sm">
                 {staff.map((s) => (
-                  <div key={`${s.user_id}-${s.role}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div
+                    key={`${s.user_id}-${s.role}`}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                  >
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                       {roleLabel(s.role)}
                     </span>
                     <div className="text-right">
                       <div className="text-xs font-bold">{s.profile?.full_name ?? "—"}</div>
-                      <div className="text-[10px] text-muted-foreground">{s.profile?.phone ?? "—"}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {s.profile?.phone ?? "—"}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -367,7 +401,9 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
           >
             {PLANS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
             ))}
           </select>
         </label>
@@ -380,7 +416,9 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
           >
             {STATUS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
             ))}
           </select>
         </label>
@@ -409,9 +447,24 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <button onClick={() => extend(30)} className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20">+ شهر</button>
-        <button onClick={() => extend(90)} className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20">+ ٣ أشهر</button>
-        <button onClick={() => extend(365)} className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20">+ سنة</button>
+        <button
+          onClick={() => extend(30)}
+          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
+        >
+          + شهر
+        </button>
+        <button
+          onClick={() => extend(90)}
+          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
+        >
+          + ٣ أشهر
+        </button>
+        <button
+          onClick={() => extend(365)}
+          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
+        >
+          + سنة
+        </button>
       </div>
 
       <label className="mt-3 block">
@@ -574,7 +627,9 @@ function ToggleRow({
         value ? "border-primary/40 bg-primary/5" : "border-border bg-background hover:bg-muted/30"
       }`}
     >
-      <div className={`h-6 w-11 rounded-full transition ${value ? "bg-primary" : "bg-muted"} relative`}>
+      <div
+        className={`h-6 w-11 rounded-full transition ${value ? "bg-primary" : "bg-muted"} relative`}
+      >
         <span
           className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
             value ? "right-0.5" : "right-[calc(100%-1.375rem)]"
@@ -608,7 +663,9 @@ function StatCard({
   };
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
-      <div className={`mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone]}`}>
+      <div
+        className={`mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone]}`}
+      >
         <Icon className="h-4 w-4" />
       </div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
@@ -617,7 +674,15 @@ function StatCard({
   );
 }
 
-function InfoRow({ icon: Icon, value, dir }: { icon: React.ComponentType<{ className?: string }>; value: string; dir?: "ltr" | "rtl" }) {
+function InfoRow({
+  icon: Icon,
+  value,
+  dir,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  dir?: "ltr" | "rtl";
+}) {
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -651,16 +716,18 @@ function avgOf(rows: any[], key: string): number | null {
 
 function statusLabel(s: string): string {
   return (
-    {
-      pending: "بانتظار",
-      accepted: "مقبول",
-      preparing: "قيد التحضير",
-      on_the_way: "في الطريق",
-      delivered: "تم التسليم",
-      cancelled: "ملغى",
-      rejected: "مرفوض",
-    } as Record<string, string>
-  )[s] ?? s;
+    (
+      {
+        pending: "بانتظار",
+        accepted: "مقبول",
+        preparing: "قيد التحضير",
+        on_the_way: "في الطريق",
+        delivered: "تم التسليم",
+        cancelled: "ملغى",
+        rejected: "مرفوض",
+      } as Record<string, string>
+    )[s] ?? s
+  );
 }
 
 function statusClass(s: string): string {
@@ -674,5 +741,12 @@ function statusClass(s: string): string {
 }
 
 function roleLabel(r: string): string {
-  return ({ owner: "مالك", driver: "مندوب", customer: "زبون", super_admin: "أدمن" } as Record<string, string>)[r] ?? r;
+  return (
+    (
+      { owner: "مالك", driver: "مندوب", customer: "زبون", super_admin: "أدمن" } as Record<
+        string,
+        string
+      >
+    )[r] ?? r
+  );
 }

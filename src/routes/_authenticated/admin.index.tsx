@@ -17,6 +17,7 @@ import {
   Building2,
   ArrowLeft,
 } from "lucide-react";
+import { getTenantStorefrontUrl } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminHome,
@@ -59,9 +60,7 @@ function AdminHome() {
   const { data: branches } = useQuery({
     queryKey: ["admin-branches-count"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("branches")
-        .select("id, tenant_id, is_active");
+      const { data } = await supabase.from("branches").select("id, tenant_id, is_active");
       return data ?? [];
     },
   });
@@ -105,21 +104,17 @@ function AdminHome() {
   const { data: usersCount } = useQuery({
     queryKey: ["admin-users-count"],
     queryFn: async () => {
-      const [{ count: customers }, { count: drivers }, { count: owners }] =
-        await Promise.all([
-          supabase
-            .from("user_roles")
-            .select("*", { count: "exact", head: true })
-            .eq("role", "customer"),
-          supabase
-            .from("user_roles")
-            .select("*", { count: "exact", head: true })
-            .eq("role", "driver"),
-          supabase
-            .from("user_roles")
-            .select("*", { count: "exact", head: true })
-            .eq("role", "owner"),
-        ]);
+      const [{ count: customers }, { count: drivers }, { count: owners }] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "customer"),
+        supabase
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "driver"),
+        supabase.from("user_roles").select("*", { count: "exact", head: true }).eq("role", "owner"),
+      ]);
       return { customers: customers ?? 0, drivers: drivers ?? 0, owners: owners ?? 0 };
     },
   });
@@ -218,7 +213,10 @@ function AdminHome() {
 
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
         <div className="mb-4 flex items-center justify-between">
-          <Link to="/admin/tenants" className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+          <Link
+            to="/admin/tenants"
+            className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline"
+          >
             إدارة كل المطاعم <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
           <h2 className="text-xl font-black">نظرة على المطاعم</h2>
@@ -243,13 +241,19 @@ function AdminHome() {
                   const st = orderStats?.perTenant.get(t.id);
                   const plan = PLAN_LABELS[t.subscription_plan] ?? PLAN_LABELS.trial;
                   const expired =
-                    t.subscription_expires_at &&
-                    new Date(t.subscription_expires_at) < new Date();
+                    t.subscription_expires_at && new Date(t.subscription_expires_at) < new Date();
                   return (
                     <tr key={t.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3">
                         <div className="font-bold">{t.name}</div>
-                        <div className="font-mono text-[10px] text-muted-foreground">/r/{t.slug}</div>
+                        <a
+                          href={getTenantStorefrontUrl(t.slug)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-[10px] text-muted-foreground hover:text-primary"
+                        >
+                          {t.slug}.mrt.llc
+                        </a>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs">
@@ -257,14 +261,14 @@ function AdminHome() {
                           {branchesByTenant.get(t.id) ?? 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {st?.count ?? 0}
-                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{st?.count ?? 0}</td>
                       <td className="px-4 py-3 text-xs font-bold text-emerald-700">
                         {formatIQD(st?.revenue ?? 0)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-bold ${plan.color}`}>
+                        <span
+                          className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-bold ${plan.color}`}
+                        >
                           {plan.label}
                         </span>
                         {expired && (
@@ -273,7 +277,9 @@ function AdminHome() {
                       </td>
                       <td className="px-4 py-3">
                         {!t.is_active ? (
-                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold text-red-700">معطّل</span>
+                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-[10px] font-bold text-red-700">
+                            معطّل
+                          </span>
                         ) : !t.accepting_orders ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800">
                             <ChefHat className="h-3 w-3" /> متوقف

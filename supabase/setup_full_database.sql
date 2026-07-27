@@ -1982,6 +1982,22 @@ REVOKE EXECUTE ON FUNCTION public.ensure_owner_restaurant() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.ensure_owner_restaurant() FROM anon;
 GRANT EXECUTE ON FUNCTION public.ensure_owner_restaurant() TO authenticated;
 
+-- Final account policy: public sign-up is for customers only. Restaurant owners
+-- are provisioned by the super admin through the protected server workflow.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, phone)
+  VALUES (NEW.id, COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), split_part(NEW.email, '@', 1)), NEW.phone)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (NEW.id, 'customer')
+  ON CONFLICT DO NOTHING;
+  RETURN NEW;
+END; $$;
+
+REVOKE ALL ON FUNCTION public.ensure_owner_restaurant() FROM PUBLIC, anon, authenticated;
+
 -- ============================================================
 -- Migration: 20260725023000_7f2a1c9e-4b5d-4e8a-9c1f-2d6a8b3e5f01.sql
 -- ============================================================
@@ -2420,4 +2436,3 @@ FROM public.orders o
 WHERE o.driver_id = auth.uid();
 
 GRANT SELECT ON public.driver_orders_history_view TO authenticated;
-

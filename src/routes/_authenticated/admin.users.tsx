@@ -10,11 +10,10 @@ export const Route = createFileRoute("/_authenticated/admin/users")({
   component: UsersPage,
 });
 
-const ROLES = ["super_admin", "owner", "driver", "customer"] as const;
+const ROLES = ["super_admin", "driver", "customer"] as const;
 type Role = (typeof ROLES)[number];
 const ROLE_LABEL: Record<Role, string> = {
   super_admin: "سوبر أدمن",
-  owner: "صاحب مطعم",
   driver: "مندوب",
   customer: "زبون",
 };
@@ -62,9 +61,7 @@ function UsersPage() {
   const updateRole = useMutation({
     mutationFn: async ({ userId, role, add }: { userId: string; role: Role; add: boolean }) => {
       if (add) {
-        const { error } = await supabase
-          .from("user_roles")
-          .insert({ user_id: userId, role });
+        const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
         if (error && !error.message.includes("duplicate")) throw error;
       } else {
         const { error } = await supabase
@@ -82,30 +79,15 @@ function UsersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const setTenant = useMutation({
-    mutationFn: async ({ userId, tenantId }: { userId: string; tenantId: string | null }) => {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ tenant_id: tenantId })
-        .eq("id", userId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["all-users"] });
-      toast.success("تم ربط المستخدم بالمطعم");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const filtered = (users ?? []).filter((u) =>
-    (u.full_name ?? "").includes(q) || (u.phone ?? "").includes(q),
+  const filtered = (users ?? []).filter(
+    (u) => (u.full_name ?? "").includes(q) || (u.phone ?? "").includes(q),
   );
 
   return (
     <>
       <PageHeader
         title="المستخدمون"
-        subtitle="إدارة الصلاحيات وربط المستخدمين بالمطاعم."
+        subtitle="العملاء يسجلون بأنفسهم، أما حسابات ملاك المطاعم فتُنشأ من صفحة المطاعم فقط."
       />
 
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
@@ -124,10 +106,7 @@ function UsersPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((u) => (
-              <div
-                key={u.id}
-                className="rounded-xl border border-border p-4"
-              >
+              <div key={u.id} className="rounded-xl border border-border p-4">
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div>
                     <div className="font-bold">{u.full_name ?? "—"}</div>
@@ -135,23 +114,11 @@ function UsersPage() {
                       {u.phone ?? u.id.slice(0, 8)}
                     </div>
                   </div>
-                  <select
-                    value={u.tenant_id ?? ""}
-                    onChange={(e) =>
-                      setTenant.mutate({
-                        userId: u.id,
-                        tenantId: e.target.value || null,
-                      })
-                    }
-                    className="rounded-lg border border-input bg-background px-3 py-1.5 text-xs"
-                  >
-                    <option value="">بدون مطعم</option>
-                    {tenants?.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="rounded-lg bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+                    {u.tenant_id
+                      ? (tenants?.find((t) => t.id === u.tenant_id)?.name ?? "مرتبط بمطعم")
+                      : "حساب عميل"}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {ROLES.map((r) => {
@@ -159,9 +126,7 @@ function UsersPage() {
                     return (
                       <button
                         key={r}
-                        onClick={() =>
-                          updateRole.mutate({ userId: u.id, role: r, add: !has })
-                        }
+                        onClick={() => updateRole.mutate({ userId: u.id, role: r, add: !has })}
                         className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
                           has
                             ? "bg-primary text-primary-foreground"
