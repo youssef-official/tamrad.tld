@@ -32,9 +32,22 @@ BEGIN
   IF NEW.delivery_lat IS NULL OR NEW.delivery_lng IS NULL THEN RAISE EXCEPTION 'حدد موقع التوصيل عبر GPS أولاً'; END IF;
   SELECT * INTO z FROM public.delivery_zones dz
   WHERE dz.tenant_id = NEW.tenant_id AND dz.is_active AND (dz.branch_id IS NULL OR dz.branch_id = NEW.branch_id)
-    AND ((dz.shape_type = 'circle' AND dz.center_lat IS NOT NULL AND dz.center_lng IS NOT NULL AND dz.radius_km IS NOT NULL
-      AND 6371 * acos(least(1, greatest(-1, cos(radians(NEW.delivery_lat))*cos(radians(dz.center_lat))*cos(radians(dz.center_lng)-radians(NEW.delivery_lng))+sin(radians(NEW.delivery_lat))*sin(radians(dz.center_lat)))) <= dz.radius_km)
-      OR (dz.shape_type = 'polygon' AND public.point_in_delivery_polygon(NEW.delivery_lat, NEW.delivery_lng, dz.polygon_points)))
+    AND (
+      (
+        dz.shape_type = 'circle'
+        AND dz.center_lat IS NOT NULL
+        AND dz.center_lng IS NOT NULL
+        AND dz.radius_km IS NOT NULL
+        AND 6371 * acos(least(1.0, greatest(-1.0,
+          cos(radians(NEW.delivery_lat)) * cos(radians(dz.center_lat)) * cos(radians(dz.center_lng) - radians(NEW.delivery_lng))
+          + sin(radians(NEW.delivery_lat)) * sin(radians(dz.center_lat))
+        ))) <= dz.radius_km
+      )
+      OR (
+        dz.shape_type = 'polygon'
+        AND public.point_in_delivery_polygon(NEW.delivery_lat, NEW.delivery_lng, dz.polygon_points)
+      )
+    )
   ORDER BY dz.sort_order, dz.created_at LIMIT 1;
   IF z.id IS NULL THEN RAISE EXCEPTION 'عنوانك خارج مناطق التوصيل المتاحة لهذا المطعم'; END IF;
   base_total := GREATEST(0, COALESCE(NEW.total_iqd, 0) - COALESCE(NEW.delivery_fee_iqd, 0));
