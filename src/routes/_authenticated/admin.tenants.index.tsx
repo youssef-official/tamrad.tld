@@ -29,6 +29,7 @@ type TenantRow = {
   subscription_status: string;
   monthly_fee_iqd: number;
   subscription_expires_at: string | null;
+  owner_email: string | null;
 };
 
 const subscriptionLabel: Record<string, string> = {
@@ -52,8 +53,9 @@ function TenantsPage() {
       const { data, error } = await supabase
         .from("tenants")
         .select(
-          "id, name, slug, phone, address, description, is_active, logo_url, custom_domain, theme_config, features_enabled, subscription_plan, subscription_status, monthly_fee_iqd, subscription_expires_at",
+          "id, name, slug, phone, address, description, is_active, logo_url, custom_domain, theme_config, features_enabled, subscription_plan, subscription_status, monthly_fee_iqd, subscription_expires_at, owner_email",
         )
+        .eq("is_admin_provisioned", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as TenantRow[];
@@ -158,7 +160,12 @@ function TenantsPage() {
               <tbody className="divide-y divide-border">
                 {filtered.map((t) => (
                   <tr key={t.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-bold">{t.name}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold">{t.name}</div>
+                      <div dir="ltr" className="mt-0.5 text-xs text-muted-foreground">
+                        {t.owner_email ?? "—"}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                       {t.slug}.mrt.llc
                     </td>

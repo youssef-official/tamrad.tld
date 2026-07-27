@@ -40,6 +40,7 @@ function AdminHome() {
         .select(
           "id, name, slug, is_active, accepting_orders, subscription_plan, subscription_status, subscription_expires_at, monthly_fee_iqd, created_at",
         )
+        .eq("is_admin_provisioned", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<{
@@ -171,7 +172,7 @@ function AdminHome() {
       value: suspendedTenants,
       hint: "منتهية أو موقوفة",
       icon: AlertTriangle,
-      color: suspendedTenants > 0 ? "bg-red-100 text-red-800" : "bg-neutral-100 text-neutral-600",
+      color: suspendedTenants > 0 ? "bg-red-100 text-red-800" : "bg-muted text-foreground",
     },
   ];
 

@@ -1998,6 +1998,22 @@ END; $$;
 
 REVOKE ALL ON FUNCTION public.ensure_owner_restaurant() FROM PUBLIC, anon, authenticated;
 
+-- Admin-provisioned restaurants and customer-only public registrations.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE public.tenants
+  ADD COLUMN IF NOT EXISTS owner_email text,
+  ADD COLUMN IF NOT EXISTS is_admin_provisioned boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, phone, email)
+  VALUES (NEW.id, COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), split_part(NEW.email, '@', 1)), NEW.phone, NEW.email)
+  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'customer') ON CONFLICT DO NOTHING;
+  RETURN NEW;
+END; $$;
+
 -- ============================================================
 -- Migration: 20260725023000_7f2a1c9e-4b5d-4e8a-9c1f-2d6a8b3e5f01.sql
 -- ============================================================

@@ -1072,6 +1072,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
           full_name: string | null
           gender: string | null
           id: string
@@ -1083,6 +1084,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           gender?: string | null
           id: string
@@ -1094,6 +1096,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           gender?: string | null
           id?: string
@@ -1272,6 +1275,8 @@ export type Database = {
           loyalty_target_orders: number
           monthly_fee_iqd: number
           name: string
+          is_admin_provisioned: boolean
+          owner_email: string | null
           phone: string | null
           slug: string
           subscription_expires_at: string | null
@@ -1299,6 +1304,8 @@ export type Database = {
           loyalty_target_orders?: number
           monthly_fee_iqd?: number
           name: string
+          is_admin_provisioned?: boolean
+          owner_email?: string | null
           phone?: string | null
           slug: string
           subscription_expires_at?: string | null
@@ -1326,6 +1333,8 @@ export type Database = {
           loyalty_target_orders?: number
           monthly_fee_iqd?: number
           name?: string
+          is_admin_provisioned?: boolean
+          owner_email?: string | null
           phone?: string | null
           slug?: string
           subscription_expires_at?: string | null

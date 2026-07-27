@@ -21,6 +21,7 @@ const ROLE_LABEL: Record<Role, string> = {
 type UserRow = {
   id: string;
   full_name: string | null;
+  email: string | null;
   phone: string | null;
   tenant_id: string | null;
   roles: Role[];
@@ -34,7 +35,7 @@ function UsersPage() {
     queryKey: ["all-users"],
     queryFn: async () => {
       const [{ data: profiles }, { data: allRoles }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, phone, tenant_id"),
+        supabase.from("profiles").select("id, full_name, email, phone, tenant_id"),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       const byUser = new Map<string, Role[]>();
@@ -53,7 +54,11 @@ function UsersPage() {
   const { data: tenants } = useQuery({
     queryKey: ["tenants-picker"],
     queryFn: async () => {
-      const { data } = await supabase.from("tenants").select("id, name").order("name");
+      const { data } = await supabase
+        .from("tenants")
+        .select("id, name")
+        .eq("is_admin_provisioned", true)
+        .order("name");
       return data ?? [];
     },
   });
@@ -80,7 +85,8 @@ function UsersPage() {
   });
 
   const filtered = (users ?? []).filter(
-    (u) => (u.full_name ?? "").includes(q) || (u.phone ?? "").includes(q),
+    (u) =>
+      (u.full_name ?? "").includes(q) || (u.phone ?? "").includes(q) || (u.email ?? "").includes(q),
   );
 
   return (
@@ -96,7 +102,7 @@ function UsersPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="ابحث بالاسم أو الهاتف..."
+            placeholder="ابحث بالاسم أو البريد أو الهاتف..."
             className="w-full rounded-xl border border-input bg-background py-2.5 pl-4 pr-10 text-sm outline-none focus:border-primary"
           />
         </div>
@@ -110,8 +116,8 @@ function UsersPage() {
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div>
                     <div className="font-bold">{u.full_name ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {u.phone ?? u.id.slice(0, 8)}
+                    <div dir="ltr" className="text-xs text-muted-foreground">
+                      {u.email ?? u.phone ?? u.id.slice(0, 8)}
                     </div>
                   </div>
                   <span className="rounded-lg bg-muted px-3 py-1.5 text-xs text-muted-foreground">

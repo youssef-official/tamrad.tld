@@ -75,6 +75,8 @@ export const createTenantWithOwner = createServerFn({ method: "POST" })
         subscription_plan: data.plan,
         subscription_status: data.status,
         monthly_fee_iqd: Math.max(0, Math.floor(data.monthlyFee || 0)),
+        owner_email: data.ownerEmail,
+        is_admin_provisioned: true,
       })
       .select("id, slug")
       .single();
@@ -98,6 +100,7 @@ export const createTenantWithOwner = createServerFn({ method: "POST" })
           id: ownerId,
           full_name: data.ownerName,
           phone: data.phone?.trim() || null,
+          email: data.ownerEmail,
           tenant_id: tenant.id,
         }),
         supabaseAdmin
