@@ -1,9 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/useMe";
 import { CustomerBottomNav } from "@/components/CustomerBottomNav";
 import { MapPin, ShoppingBag, Ticket, LogOut, User as UserIcon, ChevronLeft, Wallet } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({
@@ -24,6 +25,17 @@ function AccountPage() {
   const { data: me } = useMe();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [walletTenant, setWalletTenant] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("tamrad:last-wallet-tenant");
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.id && parsed?.name) setWalletTenant({ id: parsed.id, name: parsed.name });
+    } catch {
+      setWalletTenant(null);
+    }
+  }, []);
 
   async function signOut() {
     await qc.cancelQueries();
@@ -36,7 +48,7 @@ function AccountPage() {
     { to: "/account/addresses", label: "عناوين التوصيل", icon: MapPin, hint: "أضف وعدّل عناوين التوصيل" },
     { to: "/my-orders", label: "طلباتي السابقة", icon: ShoppingBag, hint: "متابعة الطلبات وإعادة الطلب" },
     { to: "/my-coupons", label: "أكوادي وجوائزي", icon: Ticket, hint: "أكواد الخصم وهدايا الولاء" },
-    { to: "/wallet", label: "محفظتي", icon: Wallet, hint: "الرصيد والمعاملات" },
+    { to: "/wallet", label: "محفظتي", icon: Wallet, hint: walletTenant ? `رصيدك لدى ${walletTenant.name}` : "اختر مطعماً أولاً" },
   ] as const;
 
   return (
@@ -59,10 +71,13 @@ function AccountPage() {
         <section className="space-y-2">
           {links.map((l) => {
             const Icon = l.icon;
+            const href = l.to === "/wallet" && walletTenant
+              ? `/wallet?tenant=${encodeURIComponent(walletTenant.id)}`
+              : l.to;
             return (
-              <Link
+              <a
                 key={l.to}
-                to={l.to}
+                href={href}
                 className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary"
               >
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -73,7 +88,7 @@ function AccountPage() {
                   <div className="text-[11px] text-muted-foreground">{l.hint}</div>
                 </div>
                 <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-              </Link>
+              </a>
             );
           })}
         </section>

@@ -230,6 +230,17 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   // Customer's wallet balance AT THIS tenant (per-tenant, authoritative via RPC)
   const tenantId = data?.tenant.id;
 
+  // Keep the wallet context tied to the restaurant the customer is browsing.
+  // Account pages can then open that restaurant's wallet rather than a global total.
+  useEffect(() => {
+    if (!data?.tenant?.id || typeof window === "undefined") return;
+    localStorage.setItem("tamrad:last-wallet-tenant", JSON.stringify({
+      id: data.tenant.id,
+      name: data.tenant.name,
+      slug,
+    }));
+  }, [data?.tenant?.id, data?.tenant?.name, slug]);
+
   // Broadcast notifications sent by this restaurant to its customers
   const { data: broadcasts = [] } = useQuery({
     queryKey: ["storefront-broadcasts", tenantId],
@@ -254,6 +265,25 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
     enabled: !!tenantId && !!me?.user.id,
     staleTime: 30_000,
   });
+
+  const [broadcastReadAt, setBroadcastReadAt] = useState(0);
+  const broadcastReadKey = `tamrad:broadcast-read:${tenantId}:${me?.user.id ?? "guest"}`;
+
+  useEffect(() => {
+    if (!tenantId || typeof window === "undefined") return;
+    setBroadcastReadAt(Number(localStorage.getItem(broadcastReadKey) ?? 0));
+  }, [tenantId, broadcastReadKey]);
+
+  const unreadBroadcasts = broadcasts.filter((broadcast) =>
+    new Date(broadcast.created_at).getTime() > broadcastReadAt,
+  ).length;
+
+  const openNotifications = () => {
+    const seenAt = Date.now();
+    setBroadcastReadAt(seenAt);
+    if (typeof window !== "undefined") localStorage.setItem(broadcastReadKey, String(seenAt));
+    setShowNotifications(true);
+  };
 
   useEffect(() => {
     if (checkingOut && tenantId && me?.user.id) void refetchWalletBalance();
@@ -746,15 +776,17 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
       {/* Top Floating Notification Bell */}
       {(broadcasts.length > 0 || isSignedIn) && (
         <button
-          onClick={() => setShowNotifications(true)}
+          onClick={openNotifications}
           className="fixed top-4 left-4 z-30 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow transition hover:scale-105"
           style={{ color: primary, top: "calc(1rem + env(safe-area-inset-top))" }}
         >
           <Bell className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
           <span className="hidden sm:inline">إشعارات المطعم</span>
-          <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-white">
-            {broadcasts.length}
-          </span>
+          {unreadBroadcasts > 0 && (
+            <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-white">
+              {unreadBroadcasts}
+            </span>
+          )}
         </button>
       )}
 

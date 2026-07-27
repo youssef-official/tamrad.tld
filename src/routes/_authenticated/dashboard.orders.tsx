@@ -224,7 +224,9 @@ function OrdersPage() {
                     <div className="text-xs text-muted-foreground">توصيل: {formatIQD(o.delivery_fee_iqd!)}</div>
                   )}
                   {(o.wallet_applied_iqd ?? 0) > 0 && (
-                    <div className="text-xs text-primary">من المحفظة: {formatIQD(o.wallet_applied_iqd!)}</div>
+                    <div className="text-xs font-bold text-primary">
+                      {o.payment_collected ? "مدفوع بالمحفظة بالكامل" : `مدفوع من المحفظة: ${formatIQD(o.wallet_applied_iqd!)}`}
+                    </div>
                   )}
                   {(o.wallet_applied_iqd ?? 0) > 0 && o.wallet_applied_iqd! < o.total_iqd && !o.payment_collected && (
                     <div className="text-xs font-bold text-amber-600">

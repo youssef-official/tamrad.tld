@@ -42,6 +42,9 @@ type Order = {
   status: OrderStatus;
   total_iqd: number;
   delivery_fee_iqd: number;
+  payment_method: "cash" | "wallet" | "credit";
+  payment_collected: boolean;
+  wallet_applied_iqd: number;
   customer_phone: string | null;
   customer_address: string | null;
   delivery_lat: number | null;
@@ -83,7 +86,7 @@ function DriverPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, order_number, status, total_iqd, delivery_fee_iqd, customer_phone, customer_address, delivery_lat, delivery_lng, driver_id, created_at")
+        .select("id, order_number, status, total_iqd, delivery_fee_iqd, payment_method, payment_collected, wallet_applied_iqd, customer_phone, customer_address, delivery_lat, delivery_lng, driver_id, created_at")
         .eq("driver_id", me!.user.id)
         .in("status", ["on_the_way"])
         .order("created_at", { ascending: false });
@@ -467,6 +470,11 @@ function OrderCard({
           {o.delivery_fee_iqd > 0 && (
             <div className="text-xs text-muted-foreground">
               أجرة التوصيل: {formatIQD(o.delivery_fee_iqd)}
+            </div>
+          )}
+          {o.payment_method === "wallet" && o.wallet_applied_iqd > 0 && (
+            <div className="mt-1 text-xs font-bold text-primary">
+              {o.payment_collected ? "مدفوع بالمحفظة بالكامل" : `مدفوع بالمحفظة: ${formatIQD(o.wallet_applied_iqd)}`}
             </div>
           )}
         </div>
