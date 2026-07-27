@@ -22,8 +22,7 @@ export const Route = createFileRoute("/auth")({
       { title: "تسجيل الدخول — تمراد" },
       {
         name: "description",
-        content:
-          "سجل دخولك أو أنشئ حساباً جديداً في منصة تمراد لإدارة مطعمك وطلباتك بأمان.",
+        content: "سجل دخولك أو أنشئ حساباً جديداً في منصة تمراد لإدارة مطعمك وطلباتك بأمان.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -42,8 +41,12 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [signupDone, setSignupDone] = useState<string | null>(null);
-  const [brand, setBrand] = useState<{ name: string; logo_url: string | null; primary: string } | null>(null);
+  const [accessDeniedEmail, setAccessDeniedEmail] = useState<string | null>(null);
+  const [brand, setBrand] = useState<{
+    name: string;
+    logo_url: string | null;
+    primary: string;
+  } | null>(null);
 
   function getRedirect(): string {
     if (typeof window === "undefined") return "/dashboard";
@@ -53,9 +56,24 @@ function AuthPage() {
     return "/dashboard";
   }
 
+  async function hasOwnerAccess(userId: string) {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["owner", "super_admin"]);
+    if (error) throw error;
+    return (data ?? []).length > 0;
+  }
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: getRedirect(), replace: true });
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      if (await hasOwnerAccess(data.session.user.id)) {
+        navigate({ to: getRedirect(), replace: true });
+      } else {
+        setAccessDeniedEmail(data.session.user.email ?? "البريد المستخدم");
+      }
     });
   }, [navigate]);
 
@@ -88,7 +106,7 @@ function AuthPage() {
     if (!emailValid) return setError("أدخل بريداً إلكترونياً صحيحاً.");
     if (!passwordValid) return setError("كلمة المرور 6 أحرف على الأقل.");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -102,9 +120,12 @@ function AuthPage() {
         return setError("لم يتم تفعيل الحساب بعد. تحقق من بريدك.");
       return setError(error.message);
     }
+    if (!data.user || !(await hasOwnerAccess(data.user.id))) {
+      setAccessDeniedEmail(data.user?.email ?? email.trim());
+      return;
+    }
     navigate({ to: getRedirect(), replace: true });
   }
-
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
@@ -130,7 +151,7 @@ function AuthPage() {
         return setError("هذا البريد مسجل بالفعل. سجل الدخول بدلاً من ذلك.");
       return setError(error.message);
     }
-    setSignupDone(email.trim());
+    setAccessDeniedEmail(email.trim());
   }
 
   async function handleGoogle() {
@@ -175,13 +196,11 @@ function AuthPage() {
           <h1 className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight lg:text-5xl">
             استقلال كامل لمطعمك.
             <br />
-            <span className="bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">
-              بدون عمولات، بهويتك أنت.
-            </span>
+            <span className="text-primary">بدون عمولات، بهويتك أنت.</span>
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground">
-            سجل دخولك لإدارة منيو مطعمك، متابعة الطلبات لحظياً، وتخصيص تطبيق
-            الزبون بألوانك وهويتك — كل هذا من لوحة واحدة أنيقة.
+            سجل دخولك لإدارة منيو مطعمك، متابعة الطلبات لحظياً، وتخصيص تطبيق الزبون بألوانك وهويتك —
+            كل هذا من لوحة واحدة أنيقة.
           </p>
 
           <ul className="mt-8 space-y-3">
@@ -205,11 +224,11 @@ function AuthPage() {
           <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/95 p-8 shadow-2xl shadow-primary/5 backdrop-blur">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-primary via-accent to-primary" />
 
-            {signupDone ? (
-              <SignupSuccess
-                email={signupDone}
+            {accessDeniedEmail ? (
+              <AccessDenied
+                email={accessDeniedEmail}
                 onBack={() => {
-                  setSignupDone(null);
+                  setAccessDeniedEmail(null);
                   setMode("signin");
                   setPassword("");
                 }}
@@ -309,9 +328,7 @@ function AuthPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        autoComplete={
-                          mode === "signin" ? "current-password" : "new-password"
-                        }
+                        autoComplete={mode === "signin" ? "current-password" : "new-password"}
                         dir="ltr"
                         className="w-full bg-transparent px-2 py-3 text-sm outline-none placeholder:text-muted-foreground/60"
                       />
@@ -329,9 +346,7 @@ function AuthPage() {
                       </button>
                     </div>
                     {mode === "signup" && (
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        6 أحرف على الأقل.
-                      </p>
+                      <p className="mt-1.5 text-xs text-muted-foreground">6 أحرف على الأقل.</p>
                     )}
                   </div>
 
@@ -387,34 +402,34 @@ function AuthPage() {
   );
 }
 
-function SignupSuccess({ email, onBack }: { email: string; onBack: () => void }) {
+function AccessDenied({ email, onBack }: { email: string; onBack: () => void }) {
   return (
     <div className="py-4 text-center">
       <div className="relative mx-auto grid h-20 w-20 place-items-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
-        <span className="relative grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/30">
-          <CheckCircle2 className="h-10 w-10" />
+        <span className="absolute inset-0 rounded-full bg-destructive/10" />
+        <span className="relative grid h-20 w-20 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/25">
+          <ShieldCheck className="h-10 w-10" />
         </span>
       </div>
-      <h2 className="mt-6 text-2xl font-bold tracking-tight">تم إنشاء حسابك بنجاح</h2>
+      <h2 className="mt-6 text-2xl font-bold tracking-tight">وصول غير مسموح</h2>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        أرسلنا رسالة تفعيل إلى بريدك:
+        هذا الحساب لا يملك دور صاحب مطعم، لذلك لا يمكنه الدخول إلى لوحة المطعم.
       </p>
-      <div className="mx-auto mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-1.5 text-sm font-medium" dir="ltr">
+      <div
+        className="mx-auto mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-1.5 text-sm font-medium"
+        dir="ltr"
+      >
         <Mail className="h-4 w-4 text-primary" /> {email}
       </div>
       <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        افتح البريد واضغط على رابط التفعيل، ثم عد إلى هنا لتسجيل الدخول.
+        إذا كان هذا البريد تابعاً لمطعم، تواصل مع إدارة تمراد ليتم إنشاء حساب المالك وربطه بالمطعم.
       </p>
-      <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-600 dark:text-amber-400">
-        لم يصلك البريد؟ تحقق من مجلد الرسائل غير المرغوب فيها (Spam).
-      </div>
       <button
         type="button"
         onClick={onBack}
         className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-l from-primary to-accent px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/40"
       >
-        العودة لتسجيل الدخول
+        العودة إلى تسجيل الدخول
       </button>
     </div>
   );
@@ -432,9 +447,7 @@ function Field(props: {
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-foreground">
-        {props.label}
-      </label>
+      <label className="mb-1.5 block text-sm font-medium text-foreground">{props.label}</label>
       <div className="group flex items-center rounded-xl border border-border bg-background/60 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
         <span className="pr-3 text-muted-foreground">{props.icon}</span>
         <input
