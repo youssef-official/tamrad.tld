@@ -20,6 +20,9 @@ import {
   Star,
   Calendar,
   TrendingUp,
+  Upload,
+  CheckCircle2,
+  ReceiptText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -454,12 +457,6 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
     onError: (e: Error) => toast.error(e.message),
   });
 
-  function extend(days: number) {
-    const base = expiresAt ? new Date(expiresAt) : new Date();
-    base.setDate(base.getDate() + days);
-    setExpiresAt(base.toISOString().slice(0, 10));
-  }
-
   return (
     <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent p-6">
       <h2 className="mb-4 flex items-center gap-2 text-lg font-black">
@@ -520,26 +517,7 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
         </label>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          onClick={() => extend(30)}
-          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
-        >
-          + شهر
-        </button>
-        <button
-          onClick={() => extend(90)}
-          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
-        >
-          + ٣ أشهر
-        </button>
-        <button
-          onClick={() => extend(365)}
-          className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-bold text-primary hover:bg-primary/20"
-        >
-          + سنة
-        </button>
-      </div>
+      <AdminRenewalPanel tenant={tenant} onActivated={onSaved} />
 
       <label className="mt-3 block">
         <span className="mb-1 block text-xs font-bold">ملاحظات</span>
@@ -560,6 +538,113 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
         <Save className="h-4 w-4" /> حفظ الاشتراك
       </button>
     </div>
+  );
+}
+
+function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: () => void }) {
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [amount, setAmount] = useState(tenant.monthly_fee_iqd ? String(tenant.monthly_fee_iqd) : "");
+  const [note, setNote] = useState("");
+
+  const activate = useMutation({
+    mutationFn: async () => {
+      if (!receipt) throw new Error("ارفق صورة أو PDF لوصل التحويل أولاً");
+      if (receipt.size > 10 * 1024 * 1024) throw new Error("حجم الوصل يجب ألا يتجاوز 10 ميجابايت");
+      const acceptedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+      if (!acceptedTypes.includes(receipt.type)) throw new Error("ارفع صورة JPG أو PNG أو WEBP أو ملف PDF");
+
+      const extension = receipt.name.split(".").pop()?.toLowerCase() || "file";
+      const path = `${tenant.id}/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from("subscription-receipts")
+        .upload(path, receipt, { contentType: receipt.type, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const parsedAmount = amount.trim() ? Number(amount) : null;
+      if (parsedAmount !== null && (!Number.isFinite(parsedAmount) || parsedAmount < 0)) {
+        throw new Error("اكتب مبلغ التحويل بصورة صحيحة");
+      }
+      const { data, error } = await (supabase.rpc as any)("activate_monthly_subscription", {
+        _tenant_id: tenant.id,
+        _receipt_path: path,
+        _paid_amount_iqd: parsedAmount,
+        _note: note.trim() || null,
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("تعذر تفعيل الاشتراك");
+    },
+    onSuccess: () => {
+      setReceipt(null);
+      setNote("");
+      toast.success("تم تفعيل الاشتراك لشهر وإرسال إشعار لصاحب المطعم");
+      onActivated();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <section className="mt-5 border-t border-primary/15 pt-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-black">
+            <ReceiptText className="h-4 w-4 text-primary" /> تجديد شهري موثّق
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            فعّل شهرًا واحدًا بعد إرفاق وصل التحويل. يُحفظ الوصل في سجل الاشتراكات ويصل إشعار لصاحب المطعم.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+          شهر واحد
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold">وصل التحويل</span>
+          <span className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-background px-3 py-2 text-xs font-bold text-primary hover:bg-primary/5">
+            <Upload className="h-4 w-4" />
+            <span className="truncate">{receipt ? receipt.name : "ارفع صورة أو PDF"}</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              className="sr-only"
+              onChange={(event) => setReceipt(event.target.files?.[0] ?? null)}
+            />
+          </span>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold">المبلغ المستلم (د.ع)</span>
+          <input
+            type="number"
+            min="0"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="اختياري"
+            className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+            dir="ltr"
+          />
+        </label>
+      </div>
+      <label className="mt-3 block">
+        <span className="mb-1 block text-xs font-bold">ملاحظة داخلية</span>
+        <textarea
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          rows={2}
+          placeholder="رقم التحويل أو أي ملاحظة (اختياري)"
+          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => activate.mutate()}
+        disabled={activate.isPending}
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+        {activate.isPending ? "جارٍ رفع الوصل وتفعيل الاشتراك..." : "تفعيل الاشتراك لشهر"}
+      </button>
+    </section>
   );
 }
 
