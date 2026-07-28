@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createTenantWithOwner } from "@/lib/tenant-provisioning.functions";
 import { getTenantStorefrontUrl } from "@/lib/domain";
+import { formatIQD } from "@/lib/useMe";
 import { EmptyState, PageHeader } from "@/components/DashboardShell";
 import { Check, Copy, Plus, Search, Store, X, Settings, Upload } from "lucide-react";
 import { useState } from "react";
@@ -183,6 +184,7 @@ function TenantsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
+                      <div className="mb-1 text-xs font-black text-primary">الباقة الشهرية الشاملة</div>
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${t.subscription_status === "active" && (!t.subscription_expires_at || new Date(t.subscription_expires_at) >= new Date()) ? "bg-lime text-lime-foreground" : "bg-amber-100 text-amber-800"}`}
                       >
@@ -191,6 +193,12 @@ function TenantsPage() {
                           ? "منتهي"
                           : (subscriptionLabel[t.subscription_status] ?? t.subscription_status)}
                       </span>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {formatIQD(t.monthly_fee_iqd ?? 0)} شهريًا
+                        {t.subscription_expires_at
+                          ? ` · ينتهي ${new Date(t.subscription_expires_at).toLocaleDateString("ar-IQ")}`
+                          : " · بلا تاريخ انتهاء"}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">

@@ -23,11 +23,9 @@ export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminHome,
 });
 
-const PLAN_LABELS: Record<string, { label: string; color: string }> = {
-  trial: { label: "تجريبي", color: "bg-neutral-200 text-neutral-800" },
-  basic: { label: "أساسي", color: "bg-blue-100 text-blue-800" },
-  pro: { label: "احترافي", color: "bg-purple-100 text-purple-800" },
-  enterprise: { label: "مؤسسي", color: "bg-amber-100 text-amber-900" },
+const PLAN_LABEL = {
+  label: "الباقة الشهرية الشاملة",
+  color: "bg-primary/10 text-primary",
 };
 
 function AdminHome() {
@@ -240,7 +238,7 @@ function AdminHome() {
               <tbody className="divide-y divide-border">
                 {tenants.map((t) => {
                   const st = orderStats?.perTenant.get(t.id);
-                  const plan = PLAN_LABELS[t.subscription_plan] ?? PLAN_LABELS.trial;
+                  const plan = PLAN_LABEL;
                   const expired =
                     t.subscription_expires_at && new Date(t.subscription_expires_at) < new Date();
                   return (
@@ -272,6 +270,12 @@ function AdminHome() {
                         >
                           {plan.label}
                         </span>
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          {formatIQD(t.monthly_fee_iqd ?? 0)} شهريًا
+                          {t.subscription_expires_at
+                            ? ` · ينتهي ${new Date(t.subscription_expires_at).toLocaleDateString("ar-IQ")}`
+                            : " · بلا تاريخ انتهاء"}
+                        </div>
                         {expired && (
                           <div className="mt-1 text-[10px] font-bold text-red-600">منتهي</div>
                         )}

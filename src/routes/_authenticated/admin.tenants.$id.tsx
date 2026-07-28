@@ -24,20 +24,13 @@ import {
   CheckCircle2,
   ReceiptText,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { getTenantStorefrontUrl } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/admin/tenants/$id")({
   component: TenantDetailPage,
 });
-
-const PLANS = [
-  { value: "trial", label: "تجريبي", fee: 0 },
-  { value: "basic", label: "أساسي", fee: 50000 },
-  { value: "pro", label: "احترافي", fee: 150000 },
-  { value: "enterprise", label: "مؤسسي", fee: 500000 },
-];
 
 const STATUS = [
   { value: "active", label: "نشط" },
@@ -424,18 +417,13 @@ function SubdomainCard({ tenant, onSaved }: { tenant: any; onSaved: () => void }
 }
 
 function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => void }) {
-  const [plan, setPlan] = useState<string>(tenant.subscription_plan);
+  const plan = "monthly";
   const [status, setStatus] = useState<string>(tenant.subscription_status);
   const [fee, setFee] = useState<number>(tenant.monthly_fee_iqd ?? 0);
   const [expiresAt, setExpiresAt] = useState<string>(
     tenant.subscription_expires_at ? tenant.subscription_expires_at.slice(0, 10) : "",
   );
   const [notes, setNotes] = useState<string>(tenant.subscription_notes ?? "");
-
-  useEffect(() => {
-    const preset = PLANS.find((p) => p.value === plan);
-    if (preset && plan !== tenant.subscription_plan) setFee(preset.fee);
-  }, [plan]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -464,20 +452,13 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
       </h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold">الخطة</span>
-          <select
-            value={plan}
-            onChange={(e) => setPlan(e.target.value)}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-          >
-            {PLANS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5">
+          <span className="mb-1 block text-xs font-bold text-muted-foreground">الباقة</span>
+          <div className="text-sm font-black text-primary">الباقة الشهرية الشاملة</div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            الباقة الوحيدة المتاحة، ويمكن تعديل سعرها وتاريخ انتهائها من هنا.
+          </p>
+        </div>
 
         <label className="block">
           <span className="mb-1 block text-xs font-bold">الحالة</span>
@@ -495,7 +476,7 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-bold">الرسوم الشهرية (د.ع)</span>
+          <span className="mb-1 block text-xs font-bold">المبلغ الشهري (د.ع)</span>
           <input
             type="number"
             value={fee}
@@ -506,7 +487,7 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-bold">ينتهي في</span>
+          <span className="mb-1 block text-xs font-bold">تاريخ انتهاء الاشتراك</span>
           <input
             type="date"
             value={expiresAt}
