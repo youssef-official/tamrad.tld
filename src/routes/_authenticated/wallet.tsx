@@ -4,18 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe, formatIQD } from "@/lib/useMe";
 import { fetchTenantWalletBalance } from "@/lib/walletBalance";
 import { useEffect, useState } from "react";
-import { DashboardShell, EmptyState, PageHeader } from "@/components/DashboardShell";
-import { Wallet, ShoppingBag, LayoutDashboard } from "lucide-react";
+import { EmptyState } from "@/components/DashboardShell";
+import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   component: WalletPage,
 });
-
-const NAV = [
-  { label: "طلباتي", to: "/my-orders", icon: ShoppingBag },
-  { label: "المحفظة والنقاط", to: "/wallet", icon: Wallet },
-  { label: "لوحة تحكم المطعم", to: "/dashboard", icon: LayoutDashboard },
-];
 
 function WalletPage() {
   const { data: me } = useMe();
@@ -66,44 +60,38 @@ function WalletPage() {
   });
 
   return (
-    <DashboardShell
-      title="محفظتي"
-      subtitle="زبون"
-      nav={NAV}
-      user={{ name: me?.profile?.full_name, email: me?.user.email }}
-    >
-      <PageHeader title="محفظة المطعم" subtitle="رصيد مستقل لكل مطعم — لا يختلط مع أرصدة المطاعم الأخرى." />
-
-      {!tenant ? (
-        <EmptyState icon={Wallet} title="افتح محفظة مطعم من صفحته" hint="ادخل إلى المطعم أولاً، ثم افتح حسابي ← محفظتي." />
-      ) : <>
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
+    <main dir="rtl" className="min-h-screen bg-background px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-lg">
+        {!tenant ? (
+          <EmptyState icon={Wallet} title="افتح محفظة مطعم من صفحته" hint="ادخل إلى المطعم أولاً، ثم افتح حسابي ← محفظتي." />
+        ) : <>
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
           <Wallet className="mb-3 h-8 w-8 text-primary" />
           <div className="text-sm text-muted-foreground">رصيدك لدى {resolvedTenant?.name ?? tenant.name}</div>
           <div className="mt-1 text-3xl font-black text-primary">{balanceLoading ? "..." : formatIQD(balance)}</div>
           <p className="mt-2 text-xs text-muted-foreground">يُستخدم هذا الرصيد في طلبات هذا المطعم فقط.</p>
-        </div>
+          </div>
 
-        <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
-          <h2 className="mb-4 text-lg font-black">حركات المحفظة</h2>
-          {txs && txs.length > 0 ? (
-            <div className="divide-y divide-border">
-              {txs.map((t: { id: string; type: string; amount_iqd: number; note: string | null; created_at: string }) => (
-                <div key={t.id} className="flex items-center justify-between py-3">
-                  <span className={`font-black ${t.type === "credit" ? "text-primary" : "text-destructive"}`}>
-                    {t.type === "credit" ? "+" : "-"} {formatIQD(t.amount_iqd)}
-                  </span>
-                  <div className="text-right">
-                    <div className="text-sm font-bold">{t.note || (t.type === "credit" ? "إضافة رصيد" : "دفع من المحفظة")}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString("ar-IQ")}</div>
+          <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-soft)]">
+            <h2 className="mb-4 text-lg font-black">حركات المحفظة</h2>
+            {txs && txs.length > 0 ? (
+              <div className="divide-y divide-border">
+                {txs.map((t: { id: string; type: string; amount_iqd: number; note: string | null; created_at: string }) => (
+                  <div key={t.id} className="flex items-center justify-between py-3">
+                    <span className={`font-black ${t.type === "credit" ? "text-primary" : "text-destructive"}`}>
+                      {t.type === "credit" ? "+" : "-"} {formatIQD(t.amount_iqd)}
+                    </span>
+                    <div className="text-right">
+                      <div className="text-sm font-bold">{t.note || (t.type === "credit" ? "إضافة رصيد" : "دفع من المحفظة")}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString("ar-IQ")}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : <EmptyState icon={Wallet} title="لا حركات في هذه المحفظة" hint="ستظهر هنا عمليات إضافة الرصيد والدفع لهذا المطعم." />}
-        </div>
-      </>}
-
-    </DashboardShell>
+                ))}
+              </div>
+            ) : <EmptyState icon={Wallet} title="لا حركات في هذه المحفظة" hint="ستظهر هنا عمليات إضافة الرصيد والدفع لهذا المطعم." />}
+          </div>
+        </>}
+      </div>
+    </main>
   );
 }
