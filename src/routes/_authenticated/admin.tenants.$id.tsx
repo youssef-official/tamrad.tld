@@ -544,6 +544,7 @@ function SubscriptionCard({ tenant, onSaved }: { tenant: any; onSaved: () => voi
 function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: () => void }) {
   const [receipt, setReceipt] = useState<File | null>(null);
   const [amount, setAmount] = useState(tenant.monthly_fee_iqd ? String(tenant.monthly_fee_iqd) : "");
+  const [months, setMonths] = useState("1");
   const [note, setNote] = useState("");
 
   const activate = useMutation({
@@ -564,9 +565,14 @@ function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: 
       if (parsedAmount !== null && (!Number.isFinite(parsedAmount) || parsedAmount < 0)) {
         throw new Error("اكتب مبلغ التحويل بصورة صحيحة");
       }
-      const { data, error } = await (supabase.rpc as any)("activate_monthly_subscription", {
+      const parsedMonths = Number(months);
+      if (!Number.isInteger(parsedMonths) || parsedMonths < 1 || parsedMonths > 12) {
+        throw new Error("اختر مدة من شهر إلى 12 شهراً");
+      }
+      const { data, error } = await (supabase.rpc as any)("activate_subscription", {
         _tenant_id: tenant.id,
         _receipt_path: path,
+        _months: parsedMonths,
         _paid_amount_iqd: parsedAmount,
         _note: note.trim() || null,
       });
@@ -576,7 +582,7 @@ function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: 
     onSuccess: () => {
       setReceipt(null);
       setNote("");
-      toast.success("تم تفعيل الاشتراك لشهر وإرسال إشعار لصاحب المطعم");
+      toast.success("تم تفعيل الاشتراك وإرسال إشعار لصاحب المطعم");
       onActivated();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -590,11 +596,11 @@ function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: 
             <ReceiptText className="h-4 w-4 text-primary" /> تجديد شهري موثّق
           </h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            فعّل شهرًا واحدًا بعد إرفاق وصل التحويل. يُحفظ الوصل في سجل الاشتراكات ويصل إشعار لصاحب المطعم.
+            اختر مدة التجديد بعد إرفاق وصل التحويل. يُحفظ الوصل في سجل الاشتراكات ويصل إشعار لصاحب المطعم.
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
-          شهر واحد
+          الباقة الشهرية
         </span>
       </div>
 
@@ -611,6 +617,18 @@ function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: 
               onChange={(event) => setReceipt(event.target.files?.[0] ?? null)}
             />
           </span>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold">مدة التجديد</span>
+          <select
+            value={months}
+            onChange={(event) => setMonths(event.target.value)}
+            className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+          >
+            {[1, 2, 3, 6, 12].map((value) => (
+              <option key={value} value={value}>{value === 1 ? "شهر واحد" : `${value} أشهر`}</option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-bold">المبلغ المستلم (د.ع)</span>
@@ -642,7 +660,7 @@ function AdminRenewalPanel({ tenant, onActivated }: { tenant: any; onActivated: 
         className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <CheckCircle2 className="h-4 w-4" />
-        {activate.isPending ? "جارٍ رفع الوصل وتفعيل الاشتراك..." : "تفعيل الاشتراك لشهر"}
+        {activate.isPending ? "جارٍ رفع الوصل وتفعيل الاشتراك..." : `تفعيل الاشتراك لمدة ${months} ${months === "1" ? "شهر" : "أشهر"}`}
       </button>
     </section>
   );

@@ -11,13 +11,14 @@ type Props = {
   name: string;
   logoUrl?: string | null;
   primary: string;
+  tenantId: string;
 };
 
 /**
  * In-storefront auth: lets a customer sign in / create an account without
  * ever leaving the restaurant page (modal instead of redirecting to /auth).
  */
-export function StorefrontAuthDialog({ open, onClose, onSuccess, name, logoUrl, primary }: Props) {
+export function StorefrontAuthDialog({ open, onClose, onSuccess, name, logoUrl, primary, tenantId }: Props) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [fullName, setFullName] = useState("");
@@ -34,6 +35,10 @@ export function StorefrontAuthDialog({ open, onClose, onSuccess, name, logoUrl, 
   const passwordValid = password.length >= 6;
 
   async function afterAuth() {
+    const { error: membershipError } = await (supabase.rpc as any)("ensure_customer_membership", {
+      _tenant_id: tenantId,
+    });
+    if (membershipError) throw membershipError;
     await qc.invalidateQueries({ queryKey: ["me"] });
     await qc.invalidateQueries({ queryKey: ["addresses"] });
     onSuccess?.();
@@ -59,7 +64,12 @@ export function StorefrontAuthDialog({ open, onClose, onSuccess, name, logoUrl, 
         if (msg.includes("confirm")) return setError("لم يتم تفعيل الحساب بعد. تحقق من بريدك.");
         return setError(error.message);
       }
-      await afterAuth();
+      try {
+        await afterAuth();
+      } catch (membershipError: any) {
+        setLoading(false);
+        return setError(membershipError?.message ?? "تعذر فتح حسابك في هذا المطعم.");
+      }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -73,12 +83,16 @@ export function StorefrontAuthDialog({ open, onClose, onSuccess, name, logoUrl, 
           return setError("محاولات كثيرة متتالية — انتظر دقيقة ثم جرب مرة أخرى.");
         if (msg.includes("registered") || msg.includes("exists")) {
           setMode("signin");
-          return setError("هذا البريد مسجل بالفعل — سجل دخولك من هنا.");
+          return setError("استخدم كلمة مرور هذا البريد للدخول والانضمام إلى هذا المطعم.");
         }
         return setError(error.message);
       }
       if (data.session) {
-        await afterAuth();
+        try {
+          await afterAuth();
+        } catch (membershipError: any) {
+          return setError(membershipError?.message ?? "تعذر فتح حسابك في هذا المطعم.");
+        }
       } else {
         setConfirmEmail(email.trim());
       }

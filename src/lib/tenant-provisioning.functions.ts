@@ -20,6 +20,7 @@ type CreateTenantInput = {
   plan: string;
   status: string;
   monthlyFee: number;
+  subscriptionExpiresAt?: string | null;
 };
 
 function cleanSlug(value: string) {
@@ -75,6 +76,7 @@ export const createTenantWithOwner = createServerFn({ method: "POST" })
         subscription_plan: data.plan,
         subscription_status: data.status,
         monthly_fee_iqd: Math.max(0, Math.floor(data.monthlyFee || 0)),
+        subscription_expires_at: data.subscriptionExpiresAt || null,
         owner_email: data.ownerEmail,
         is_admin_provisioned: true,
       })

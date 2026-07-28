@@ -144,8 +144,6 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   const install = useInstallPrompt();
 
   const { data: me } = useMe();
-  const { data: addresses = [] } = useAddresses();
-  const { create: createAddress } = useAddressMutations();
   const isSignedIn = !!me?.user.id;
   const qc = useQueryClient();
 
@@ -229,6 +227,8 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
 
   // Customer's wallet balance AT THIS tenant (per-tenant, authoritative via RPC)
   const tenantId = data?.tenant.id;
+  const { data: addresses = [] } = useAddresses(tenantId ?? null);
+  const { create: createAddress } = useAddressMutations(tenantId ?? null);
 
   // Keep the wallet context tied to the restaurant the customer is browsing.
   // Account pages can then open that restaurant's wallet rather than a global total.
@@ -621,13 +621,20 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
         return;
       }
       const savedPhone = phone.trim();
-      if (savedPhone && savedPhone !== me?.profile?.phone) {
+      if (savedPhone) {
         const { error: phoneError } = await supabase
-          .from("profiles")
-          .update({ phone: savedPhone })
-          .eq("id", u.user.id);
+          .from("tenant_customers" as any)
+          .upsert(
+            {
+              tenant_id: data.tenant.id,
+              user_id: u.user.id,
+              full_name: me?.profile?.full_name ?? null,
+              phone: savedPhone,
+              email: u.user.email ?? null,
+            },
+            { onConflict: "tenant_id,user_id" },
+          );
         if (phoneError) throw phoneError;
-        qc.invalidateQueries({ queryKey: ["me"] });
       }
       const items = Object.entries(cart).map(([key, v]) => {
         const anyV = v as any;
@@ -1350,6 +1357,7 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
         name={data.tenant.name}
         logoUrl={data.tenant.logo_url}
         primary={primary}
+        tenantId={data.tenant.id}
       />
 
       {isSignedIn && <CustomerBottomNav storefrontSlug={slug} primary={primary} />}

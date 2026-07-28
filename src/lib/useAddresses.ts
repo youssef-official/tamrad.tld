@@ -5,6 +5,7 @@ import { useMe } from "./useMe";
 export type CustomerAddress = {
   id: string;
   user_id: string;
+  tenant_id: string | null;
   label: string;
   full_address: string;
   city: string | null;
@@ -26,38 +27,40 @@ export type AddressInput = {
   is_default?: boolean;
 };
 
-export function useAddresses() {
+export function useAddresses(tenantId: string | null = null) {
   const { data: me } = useMe();
   const userId = me?.user.id ?? null;
 
   return useQuery({
-    queryKey: ["customer-addresses", userId],
+    queryKey: ["customer-addresses", userId, tenantId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("customer_addresses" as any) as any)
+      let query = (supabase.from("customer_addresses" as any) as any)
         .select("*")
         .eq("user_id", userId!)
         .order("is_default", { ascending: false })
         .order("created_at", { ascending: true });
+      query = tenantId ? query.eq("tenant_id", tenantId) : query.is("tenant_id", null);
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as CustomerAddress[];
     },
   });
 }
 
-export function useAddressMutations() {
+export function useAddressMutations(tenantId: string | null = null) {
   const qc = useQueryClient();
   const { data: me } = useMe();
   const userId = me?.user.id ?? null;
 
   const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["customer-addresses", userId] });
+    qc.invalidateQueries({ queryKey: ["customer-addresses", userId, tenantId] });
 
   const create = useMutation({
     mutationFn: async (input: AddressInput) => {
       if (!userId) throw new Error("غير مسجل الدخول");
       const { data, error } = await (supabase.from("customer_addresses" as any) as any)
-        .insert({ ...input, user_id: userId })
+        .insert({ ...input, user_id: userId, tenant_id: tenantId })
         .select("*")
         .single();
       if (error) throw error;
@@ -68,9 +71,9 @@ export function useAddressMutations() {
 
   const update = useMutation({
     mutationFn: async ({ id, ...input }: AddressInput & { id: string }) => {
-      const { error } = await (supabase.from("customer_addresses" as any) as any)
-        .update(input)
-        .eq("id", id);
+      let query = (supabase.from("customer_addresses" as any) as any).update(input).eq("id", id);
+      if (tenantId) query = query.eq("tenant_id", tenantId);
+      const { error } = await query;
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -78,9 +81,9 @@ export function useAddressMutations() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("customer_addresses" as any) as any)
-        .delete()
-        .eq("id", id);
+      let query = (supabase.from("customer_addresses" as any) as any).delete().eq("id", id);
+      if (tenantId) query = query.eq("tenant_id", tenantId);
+      const { error } = await query;
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -88,9 +91,11 @@ export function useAddressMutations() {
 
   const setDefault = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("customer_addresses" as any) as any)
+      let query = (supabase.from("customer_addresses" as any) as any)
         .update({ is_default: true })
         .eq("id", id);
+      if (tenantId) query = query.eq("tenant_id", tenantId);
+      const { error } = await query;
       if (error) throw error;
     },
     onSuccess: invalidate,

@@ -5,9 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { createTenantWithOwner } from "@/lib/tenant-provisioning.functions";
 import { getTenantStorefrontUrl } from "@/lib/domain";
 import { EmptyState, PageHeader } from "@/components/DashboardShell";
-import { Check, Copy, Plus, Search, Store, X, Settings } from "lucide-react";
+import { Check, Copy, Plus, Search, Store, X, Settings, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { uploadTenantImage } from "@/lib/uploadImage";
 
 export const Route = createFileRoute("/_authenticated/admin/tenants/")({
   component: TenantsPage,
@@ -258,6 +259,7 @@ function TenantForm({
   const [address, setAddress] = useState(tenant?.address ?? "");
   const [description, setDescription] = useState(tenant?.description ?? "");
   const [logoUrl, setLogoUrl] = useState(tenant?.logo_url ?? "");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [customDomain, setCustomDomain] = useState(tenant?.custom_domain ?? "");
   const theme = tenant?.theme_config ?? {};
   const [primary, setPrimary] = useState<string>(theme.primary ?? "#1f5f3f");
@@ -266,9 +268,12 @@ function TenantForm({
   const [loyalty, setLoyalty] = useState<boolean>(!!features.loyalty);
   const [wallet, setWallet] = useState<boolean>(!!features.wallet);
   const [credit, setCredit] = useState<boolean>(!!features.credit);
-  const [plan, setPlan] = useState<string>(tenant?.subscription_plan ?? "trial");
+  const plan = "monthly";
   const [status, setStatus] = useState<string>(tenant?.subscription_status ?? "active");
-  const [monthlyFee, setMonthlyFee] = useState<number>(tenant?.monthly_fee_iqd ?? 0);
+  const [monthlyFee, setMonthlyFee] = useState<number>(tenant?.monthly_fee_iqd ?? 400000);
+  const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState(
+    tenant?.subscription_expires_at ? tenant.subscription_expires_at.slice(0, 10) : "",
+  );
   const [loading, setLoading] = useState(false);
   const [credentials, setCredentials] = useState<{
     email: string;
@@ -281,19 +286,23 @@ function TenantForm({
     e.preventDefault();
     setLoading(true);
     try {
+      const resolvedLogoUrl = logoFile
+        ? await uploadTenantImage(tenant?.id ?? "new-tenant", logoFile, "logos")
+        : logoUrl || null;
       const payload = {
         name,
         slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
         phone: phone || null,
         address: address || null,
         description: description || null,
-        logo_url: logoUrl || null,
+        logo_url: resolvedLogoUrl,
         custom_domain: customDomain || null,
         theme_config: { ...theme, primary, accent },
         features_enabled: { loyalty, wallet, credit },
         subscription_plan: plan,
         subscription_status: status,
         monthly_fee_iqd: Math.max(0, Math.floor(monthlyFee)),
+        subscription_expires_at: subscriptionExpiresAt || null,
       };
       if (tenant) {
         const { error } = await supabase.from("tenants").update(payload).eq("id", tenant.id);
@@ -307,7 +316,7 @@ function TenantForm({
             ownerName,
             ownerEmail,
             ownerPassword,
-            logoUrl,
+            logoUrl: resolvedLogoUrl ?? undefined,
             customDomain,
             monthlyFee,
             primary,
@@ -315,6 +324,7 @@ function TenantForm({
             loyalty,
             wallet,
             credit,
+            subscriptionExpiresAt: subscriptionExpiresAt || null,
           },
         });
         const url = getTenantStorefrontUrl(result.slug, customDomain || null);
@@ -364,15 +374,22 @@ function TenantForm({
             <Section title="الهوية">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="اسم المطعم" value={name} onChange={setName} required />
-                <Field
-                  label="الشعار (رابط)"
-                  value={logoUrl}
-                  onChange={setLogoUrl}
-                  dir="ltr"
-                  hint="URL كامل لصورة الشعار"
-                />
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-bold">شعار المطعم</span>
+                  <span className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-bold text-primary hover:bg-primary/10">
+                    <Upload className="h-4 w-4" />
+                    <span className="truncate">{logoFile?.name ?? "ارفع صورة الشعار"}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)}
+                    />
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">JPG أو PNG أو WEBP، وتُحفظ الصورة داخل بيانات المطعم.</span>
+                </label>
               </div>
-              {logoUrl && (
+              {logoUrl && !logoFile && (
                 <img
                   src={logoUrl}
                   alt="logo"
@@ -455,19 +472,10 @@ function TenantForm({
 
             <Section title="الاشتراك">
               <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-bold">الخطة</span>
-                  <select
-                    value={plan}
-                    onChange={(e) => setPlan(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm"
-                  >
-                    <option value="trial">تجريبي</option>
-                    <option value="basic">أساسي</option>
-                    <option value="pro">احترافي</option>
-                    <option value="enterprise">مؤسسات</option>
-                  </select>
-                </label>
+                <div className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-2.5">
+                  <div className="text-sm font-black">الباقة الشهرية الشاملة</div>
+                  <div className="mt-1 text-xs text-muted-foreground">تشمل جميع المميزات، ويمكنك إيقاف كل ميزة من الأعلى.</div>
+                </div>
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-bold">الحالة</span>
                   <select
@@ -489,6 +497,16 @@ function TenantForm({
                     value={monthlyFee}
                     onChange={(e) => setMonthlyFee(Number(e.target.value))}
                     className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-bold">تاريخ انتهاء الاشتراك</span>
+                  <input
+                    type="date"
+                    value={subscriptionExpiresAt}
+                    onChange={(e) => setSubscriptionExpiresAt(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm"
+                    dir="ltr"
                   />
                 </label>
               </div>
