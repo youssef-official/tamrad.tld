@@ -53,7 +53,7 @@ const NAV = [
   { label: "إرسال الإشعارات", to: "/dashboard/broadcast", icon: Bell },
   { label: "مناطق التوصيل", to: "/dashboard/zones", icon: Map },
   { label: "تسويات المناديب", to: "/dashboard/settlements", icon: Wallet },
-  { label: "التقارير", to: "/dashboard/reports", icon: BarChart3 },
+  { label: "الإحصائيات", to: "/dashboard/reports", icon: BarChart3 },
   { label: "الدعم والبلاغات", to: "/dashboard/support", icon: LifeBuoy },
   { label: "الإعدادات", to: "/dashboard/settings", icon: Settings },
 ];
