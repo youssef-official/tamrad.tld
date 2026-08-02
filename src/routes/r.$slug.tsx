@@ -147,25 +147,6 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   const isSignedIn = !!me?.user.id;
   const qc = useQueryClient();
 
-  // Auto-select default address once loaded
-  useEffect(() => {
-    if (!isSignedIn) {
-      setSelectedAddressId(null);
-      return;
-    }
-    if (addresses.length === 0) {
-      setSelectedAddressId(null);
-      return;
-    }
-    if (!selectedAddressId || !addresses.find((a) => a.id === selectedAddressId)) {
-      const def = addresses.find((a) => a.is_default) ?? addresses[0];
-      setSelectedAddressId(def.id);
-      if (!phone && me?.profile?.phone) setPhone(me.profile.phone);
-    }
-  }, [isSignedIn, addresses, selectedAddressId, me?.profile?.phone, phone]);
-
-  const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
-
   const {
     data,
     isLoading,
@@ -229,6 +210,27 @@ export function RestaurantPage({ slugProp }: { slugProp?: string } = {}) {
   const tenantId = data?.tenant.id;
   const { data: addresses = [] } = useAddresses(tenantId ?? null);
   const { create: createAddress } = useAddressMutations(tenantId ?? null);
+
+  // The address query must be initialized before it is read. Keeping this
+  // effect after useAddresses also prevents production minification from
+  // exposing a temporal-dead-zone ReferenceError during the first render.
+  useEffect(() => {
+    if (!isSignedIn) {
+      setSelectedAddressId(null);
+      return;
+    }
+    if (addresses.length === 0) {
+      setSelectedAddressId(null);
+      return;
+    }
+    if (!selectedAddressId || !addresses.find((address) => address.id === selectedAddressId)) {
+      const defaultAddress = addresses.find((address) => address.is_default) ?? addresses[0];
+      setSelectedAddressId(defaultAddress.id);
+      if (!phone && me?.profile?.phone) setPhone(me.profile.phone);
+    }
+  }, [isSignedIn, addresses, selectedAddressId, me?.profile?.phone, phone]);
+
+  const selectedAddress = addresses.find((address) => address.id === selectedAddressId) ?? null;
 
   // Keep the wallet context tied to the restaurant the customer is browsing.
   // Account pages can then open that restaurant's wallet rather than a global total.
